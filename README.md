@@ -1,6 +1,6 @@
 # Pinput
 
-![A game controller with a circled letter P where the guide/home/Xbox/PS button would be.](logo.png)
+![A game controller with a circled letter P where the guide/home/Xbox/PS button would be.](logo-128.png)
 
 Ever wish [PICO-8](https://www.lexaloffle.com/pico-8.php) had dual analog stick support? Me too. Pinput is a Lua library that works with an external helper app to provide [XInput](https://docs.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput)-like gamepad support to an unmodifed copy of PICO-8.
 
