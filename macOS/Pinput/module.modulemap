@@ -1,0 +1,5 @@
+module Clibproc [system] {
+    header "libproc.h"
+    link "proc"
+    export *
+}
