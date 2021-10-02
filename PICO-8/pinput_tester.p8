@@ -95,7 +95,7 @@ function _draw()
  -- buttons
  
  print("⬆️", ⬆️_x, ⬆️_y,
-  clrs_button[1 + pi_btn(pi_⬅️, 0)])
+  clrs_button[1 + pi_btn(pi_⬆️, 0)])
  
  print("⬇️", ⬇️_x, ⬇️_y,
   clrs_button[1 + pi_btn(pi_⬇️, 0)])
@@ -106,7 +106,7 @@ function _draw()
  print("➡️", ➡️_x, ➡️_y,
   clrs_button[1 + pi_btn(pi_➡️, 0)])
 	
-	circ(a_x + 1, a_y + 2, btn_r, clr_border)
+ circ(a_x + 1, a_y + 2, btn_r, clr_border)
  print("a", a_x, a_y,
   clrs_button[1 + pi_btn(pi_a, 0)])
  
