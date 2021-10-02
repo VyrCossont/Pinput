@@ -1,3 +1,9 @@
+/**
+ * Pinput server for cartridges exported to web format.
+ * Include this module in your exported HTML and call `Pinput.init()`,
+ * and it should work the same way as the desktop versions.
+ */
+
 const magic = [
     0x02,
     0x20,
@@ -25,10 +31,6 @@ const connected = 1 << 0;
 const hasGuideButton = 1 << 3;
 
 // Gamepad battery status not supported.
-
-// See https://w3c.github.io/gamepad/#dfn-standard-gamepad for what we should be getting.
-// What we're actually getting has the guide button at index 0 instead of 16.
-// TODO: test in browsers other than Firefox
 
 const buttonsLoOffset = 2;
 const dpadUp = 1 << 0;
