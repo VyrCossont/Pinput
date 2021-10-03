@@ -101,8 +101,12 @@ function loop() {
             continue;
         }
 
-        // Assume any gamepad using the 'standard' mapping has a usable guide button.
-        let flags = connected | hasGuideButton;
+        // Some gamepads use the standard mapping but have a `buttons` array too short to have the guide button.
+        // The Logitech F310 in DirectInput mode is an example.
+        let flags = connected;
+        if (gamepad.buttons.length > 16) {
+            flags |= hasGuideButton;
+        }
         pico8_gpio[gamepadBase] = flags;
 
         // Handle low byte of buttons.
@@ -153,7 +157,7 @@ function loop() {
         if (gamepad.buttons[3].pressed) {
             buttonsHi |= y;
         }
-        if (gamepad.buttons[16].pressed) {
+        if (gamepad.buttons.length > 16 && gamepad.buttons[16].pressed) {
             buttonsHi |= guide;
         }
         pico8_gpio[gamepadBase + buttonsHiOffset] = buttonsHi;

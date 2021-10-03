@@ -42,7 +42,11 @@ Controller-wise, I've tested it with an Xbox Wireless Controller with Bluetooth 
 
 Supports reading all buttons, sticks, and triggers. No battery information is available through the Web Gamepad API, so that doesn't work.
 
-Known not to work with the Xbox Wireless Controller with Bluetooth (model 1708) when used with Firefox for macOS, due to incorrect button mappings for that controller. The DualShock 4 (model CUH-ZCT2) does work correctly in Firefox. Chrome and Safari for macOS work as expected with both controllers.
+Known not to work with the Xbox Wireless Controller with Bluetooth (model 1708) when used with Firefox for macOS, due to incorrect button mappings for that controller. Chrome and Safari for macOS work as expected.
+
+The DualShock 4 (model CUH-ZCT2) does work correctly in Firefox, Chrome, and Safari for macOS.
+
+The Logitech F310 in DirectInput mode works in Chrome for macOS, and only Chrome. It does not work in XInput mode, and it does not work in either mode with Firefox or Safari for macOS.
 
 ## Future goals
 
