@@ -18,7 +18,7 @@ The app displays the process ID of whatever PICO-8 process it found that has the
 
 ### web
 
-Include the `web/pinput.js` module in your [exported web cartridge](https://www.lexaloffle.com/dl/docs/pico-8_manual.html#Web_Applications_)somehow, and call its `.init()` method. The same client code will work with both desktop and web versions.
+Include the `web/pinput.js` module in your [exported web cartridge](https://www.lexaloffle.com/dl/docs/pico-8_manual.html#Web_Applications_) somehow, and call its `.init()` method. The same client code will work with both desktop and web versions.
 
 To try my exported cartridge, check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/PICO-8/pinput_tester_html/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
 
