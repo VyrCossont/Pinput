@@ -2,6 +2,8 @@
  * Pinput server for cartridges exported to web format.
  * Include this module in your exported HTML and call `Pinput.init()`,
  * and it should work the same way as the desktop versions.
+ *
+ * by @vyrcossont@demon.social
  */
 
 const magic = [
@@ -54,12 +56,20 @@ const guide = 1 << 6;
 const triggerMax = 0xff;
 const leftTriggerOffset = 4;
 const rightTriggerOffset = 5;
+const triggerMappings = new Map();
+triggerMappings.set(6, leftTriggerOffset);
+triggerMappings.set(7, rightTriggerOffset);
 
 const axisMax = 0x7fff;
 const leftStickXOffset = 6;
 const leftStickYOffset = 8;
 const rightStickXOffset = 10;
 const rightStickYOffset = 12;
+const axisMappings = new Map();
+axisMappings.set(0, [leftStickXOffset, 1]);
+axisMappings.set(1, [leftStickYOffset, -1]);
+axisMappings.set(2, [rightStickXOffset, 1]);
+axisMappings.set(3, [rightStickYOffset, -1]);
 
 // TODO: rumble using Web Vibration API or GamepadHapticActuator (preferred)
 const rumbleMax = 0xff;
@@ -83,8 +93,8 @@ function loop() {
 
     // Write each supported gamepad's current state into GPIO.
     // Note: `navigator.getGamepads()` does not return an array on Chrome.
-    for (const [i, gamepad] of Array.from(navigator.getGamepads()).slice(0, maxGamepads).entries()) {
-        const gamepadBase = i * gamepadStride;
+    for (const [gamepadIndex, gamepad] of Array.from(navigator.getGamepads()).slice(0, maxGamepads).entries()) {
+        const gamepadBase = gamepadIndex * gamepadStride;
         if (gamepad === null || gamepad.mapping !== 'standard' || !gamepad.connected) {
             // This is a disconnected or unsupported gamepad: zero it and go to the next one.
             pico8_gpio.fill(0, gamepadBase, gamepadBase + gamepadStride);
@@ -95,6 +105,7 @@ function loop() {
         let flags = connected | hasGuideButton;
         pico8_gpio[gamepadBase] = flags;
 
+        // Handle low byte of buttons.
         let buttonsLo = 0;
         if (gamepad.buttons[12].pressed) {
             buttonsLo |= dpadUp;
@@ -122,6 +133,7 @@ function loop() {
         }
         pico8_gpio[gamepadBase + buttonsLoOffset] = buttonsLo;
 
+        // Handle high byte of buttons.
         let buttonsHi = 0;
         if (gamepad.buttons[4].pressed) {
             buttonsHi |= leftBumper;
@@ -145,6 +157,22 @@ function loop() {
             buttonsHi |= guide;
         }
         pico8_gpio[gamepadBase + buttonsHiOffset] = buttonsHi;
+
+        // Map triggers.
+        // Triggers are considered analog buttons, not axes.
+        for (const [buttonIndex, triggerOffset] of triggerMappings) {
+            const triggerValue = gamepad.buttons[buttonIndex].value * triggerMax;
+            pico8_gpio[gamepadBase + triggerOffset] = triggerValue;
+        }
+
+        // Map axes. Y axes have to be flipped to match XInput/Apple Game Controller conventions for up.
+        for (const [axisIndex, [axisOffset, axisMultiplier]] of axisMappings) {
+            const axisValue = gamepad.axes[axisIndex] * axisMultiplier * axisMax;
+            const axisLo = (axisValue >>> 0) & 0xff;
+            pico8_gpio[gamepadBase + axisOffset] = axisLo;
+            const axisHi = (axisValue >>> 8) & 0xff;
+            pico8_gpio[gamepadBase + axisOffset + 1] = axisHi;
+        }
     }
 
     window.requestAnimationFrame(loop);
