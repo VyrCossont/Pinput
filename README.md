@@ -46,7 +46,7 @@ Known not to work with the Xbox Wireless Controller with Bluetooth (model 1708) 
 
 The DualShock 4 (model CUH-ZCT2) does work correctly in Firefox, Chrome, and Safari for macOS.
 
-The Logitech F310 in DirectInput mode works in Chrome for macOS, and only Chrome. It does not work in XInput mode, and it does not work in either mode with Firefox or Safari for macOS.
+The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for macOS. It does not work in XInput mode. Note that in DirectInput mode, the triggers act as digital buttons (reporting either min or max values) and the guide button is inaccessible. Additionally, the analog/digital mode switch on the front should be set to analog (light off).
 
 ## Future goals
 
