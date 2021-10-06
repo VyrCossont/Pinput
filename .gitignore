@@ -1,0 +1,4 @@
+*.vcxproj.user
+.vs
+/Windows/**/Debug
+/Windows/**/Release
