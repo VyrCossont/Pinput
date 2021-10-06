@@ -125,6 +125,11 @@ HANDLE findPico8Process() {
     return NULL;
 }
 
+/// <summary>
+/// Find module belonging to PICO-8 executable within its process.
+/// </summary>
+/// <param name="pico8Handle">Handle to PICO-8 process.</param>
+/// <returns>Module corresponding to pico8.exe, or NULL if not found.</returns>
 HMODULE findPico8Module(HANDLE pico8Handle) {
     BOOL ok;
 
@@ -216,6 +221,24 @@ int main()
     std::wcout << "    lpBaseOfDll = " << moduleInfo.lpBaseOfDll << std::endl;
     std::wcout << "    SizeOfImage = " << moduleInfo.SizeOfImage << std::endl;
     std::wcout << "    EntryPoint = " << moduleInfo.EntryPoint << std::endl;
+
+    // TODO: read entire module into our process memory with ReadProcessMemory
+
+    // TODO: find offset of Pinput magic bytes 0220c74677ab446ebedc7fd6d277984d within that module
+    //  lpBaseOfDll = 00400000
+    //  SizeOfImage = 5206016
+    //  EntryPoint = 004014C0
+    //  Cheat Engine shows the magic at pico8.exe+45DB9C,
+    //  which is consistent with the above,
+    //  and pico8.exe doesn't appear to use ASLR
+
+    // TODO: calculate area corresponding to cartridge RAM
+
+    // TODO: read only that area in future
+
+    // TODO: try writing back changes with WriteProcessMemory
+
+    // TODO: can we get XInput events in a console app?
     
     ok = CloseHandle(pico8Handle);
     if (!ok) {
@@ -226,6 +249,3 @@ int main()
     
     return EXIT_SUCCESS;
 }
-
-
-// 0220c74677ab446ebedc7fd6d277984d
