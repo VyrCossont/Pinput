@@ -14,6 +14,8 @@
 #include <WinBase.h>
 #include <Shlwapi.h>
 
+constexpr const wchar_t* pico8ExecutableName = L"pico8.exe";
+
 /// <summary>
 /// Print the last error from a Windows API function to stderr.
 /// </summary>
@@ -71,9 +73,7 @@ std::vector<DWORD> listPids() {
 /// Find PICO-8.
 /// </summary>
 /// <returns>A handle to a PICO-8 process, or NULL if not found.</returns>
-HANDLE findPico8() {
-    const wchar_t* pico8ExecutableName = L"pico8.exe";
-
+HANDLE findPico8Process() {
     auto pids = listPids();
     if (pids.size() == 0) {
         // This shouldn't ever happen except maybe in a sandbox?
@@ -125,9 +125,67 @@ HANDLE findPico8() {
     return NULL;
 }
 
+HMODULE findPico8Module(HANDLE pico8Handle) {
+    BOOL ok;
+
+    DWORD modulesSizeNeeded;
+    ok = EnumProcessModulesEx(
+        pico8Handle,
+        NULL,
+        0,
+        &modulesSizeNeeded,
+        LIST_MODULES_ALL
+    );
+    if (!ok) {
+        std::wcerr << "EnumProcessModulesEx (no module array) failed on PICO-8 handle: ";
+        printLastError();
+        return NULL;
+    }
+    DWORD numModules = modulesSizeNeeded / sizeof HMODULE;
+    HMODULE* modules = new HMODULE[numModules];
+    ok = EnumProcessModulesEx(
+        pico8Handle,
+        modules,
+        numModules * sizeof HMODULE,
+        &modulesSizeNeeded,
+        LIST_MODULES_ALL
+    );
+    if (!ok) {
+        std::wcerr << "EnumProcessModulesEx (with module array) failed on PICO-8 handle: ";
+        printLastError();
+        return NULL;
+    }
+    std::wcout << "Found " << numModules << " modules" << std::endl;
+
+    for (DWORD i = 0; i < numModules; i++) {
+        auto module = modules[i];
+
+        wchar_t moduleFilename[MAX_PATH];
+        DWORD moduleFilenameLength = GetModuleBaseName(pico8Handle, module, moduleFilename, MAX_PATH);
+        if (!moduleFilenameLength) {
+            // We're looking for PICO-8, so modules without names aren't it.
+            continue;
+        }
+
+        if (PathMatchSpecEx(
+            moduleFilename,
+            pico8ExecutableName,
+            PMSF_NORMAL
+        ) == S_OK) {
+            delete[] modules;
+            return module;
+        }
+    }
+
+    delete[] modules;
+    return NULL;
+}
+
 int main()
 {
-    HANDLE pico8Handle = findPico8();
+    BOOL ok;
+
+    HANDLE pico8Handle = findPico8Process();
     if (!pico8Handle) {
         std::wcerr << "Couldn't find a running PICO-8 process!" << std::endl;
         return EXIT_FAILURE;
@@ -141,7 +199,25 @@ int main()
     }
     std::wcout << "PICO-8 PID = " << pico8Pid << std::endl;
 
-    BOOL ok = CloseHandle(pico8Handle);
+    HMODULE pico8Module = findPico8Module(pico8Handle);
+    if (!pico8Module) {
+        std::wcerr << "Couldn't find a PICO-8 module within the PICO-8 process!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::wcout << "PICO-8 module = " << pico8Module << std::endl;
+
+    MODULEINFO moduleInfo;
+    ok = GetModuleInformation(pico8Handle, pico8Module, &moduleInfo, sizeof MODULEINFO);
+    if (!ok) {
+        std::wcerr << "GetModuleInformation failed on PICO-8 module " << pico8Module << ": ";
+        printLastError();
+        return EXIT_FAILURE;
+    }
+    std::wcout << "    lpBaseOfDll = " << moduleInfo.lpBaseOfDll << std::endl;
+    std::wcout << "    SizeOfImage = " << moduleInfo.SizeOfImage << std::endl;
+    std::wcout << "    EntryPoint = " << moduleInfo.EntryPoint << std::endl;
+    
+    ok = CloseHandle(pico8Handle);
     if (!ok) {
         std::wcerr << "CloseHandle failed on PICO-8 handle: ";
         printLastError();
@@ -153,14 +229,3 @@ int main()
 
 
 // 0220c74677ab446ebedc7fd6d277984d
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
