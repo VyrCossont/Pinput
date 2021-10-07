@@ -2,3 +2,4 @@
 .vs
 /Windows/**/Debug
 /Windows/**/Release
+/Windows/**/*.aps
