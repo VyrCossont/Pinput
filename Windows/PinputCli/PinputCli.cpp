@@ -2,6 +2,8 @@
 #define UNICODE 1
 #endif
 
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -15,6 +17,29 @@
 #include <Shlwapi.h>
 
 constexpr const wchar_t* pico8ExecutableName = L"pico8.exe";
+constexpr const uint8_t pinputMagic[] = {
+    0x02, 
+    0x20,
+    0xc7,
+    0x46,
+    0x77,
+    0xab,
+    0x44,
+    0x6e,
+    0xbe,
+    0xdc,
+    0x7f,
+    0xd6,
+    0xd2,
+    0x77,
+    0x98,
+    0x4d,
+};
+
+constexpr DWORD pico8GpioOffsetFromCartridgeRamBase = 0x5f80;
+constexpr DWORD pico8GpioSize = 0x80;
+constexpr DWORD pico8RegularMemorySize = 0x8000;
+constexpr DWORD pico8ExtendedMemorySize = 0x10000;
 
 /// <summary>
 /// Print the last error from a Windows API function to stderr.
@@ -128,14 +153,14 @@ HANDLE findPico8Process() {
 /// <summary>
 /// Find module belonging to PICO-8 executable within its process.
 /// </summary>
-/// <param name="pico8Handle">Handle to PICO-8 process.</param>
+/// <param name="pico8Process">Handle to PICO-8 process.</param>
 /// <returns>Module corresponding to pico8.exe, or NULL if not found.</returns>
-HMODULE findPico8Module(HANDLE pico8Handle) {
+HMODULE findPico8Module(HANDLE pico8Process) {
     BOOL ok;
 
     DWORD modulesSizeNeeded;
     ok = EnumProcessModulesEx(
-        pico8Handle,
+        pico8Process,
         NULL,
         0,
         &modulesSizeNeeded,
@@ -149,7 +174,7 @@ HMODULE findPico8Module(HANDLE pico8Handle) {
     DWORD numModules = modulesSizeNeeded / sizeof HMODULE;
     HMODULE* modules = new HMODULE[numModules];
     ok = EnumProcessModulesEx(
-        pico8Handle,
+        pico8Process,
         modules,
         numModules * sizeof HMODULE,
         &modulesSizeNeeded,
@@ -166,7 +191,7 @@ HMODULE findPico8Module(HANDLE pico8Handle) {
         auto module = modules[i];
 
         wchar_t moduleFilename[MAX_PATH];
-        DWORD moduleFilenameLength = GetModuleBaseName(pico8Handle, module, moduleFilename, MAX_PATH);
+        DWORD moduleFilenameLength = GetModuleBaseName(pico8Process, module, moduleFilename, MAX_PATH);
         if (!moduleFilenameLength) {
             // We're looking for PICO-8, so modules without names aren't it.
             continue;
@@ -190,13 +215,13 @@ int main()
 {
     BOOL ok;
 
-    HANDLE pico8Handle = findPico8Process();
-    if (!pico8Handle) {
+    HANDLE pico8Process = findPico8Process();
+    if (!pico8Process) {
         std::wcerr << "Couldn't find a running PICO-8 process!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    DWORD pico8Pid = GetProcessId(pico8Handle);
+    DWORD pico8Pid = GetProcessId(pico8Process);
     if (!pico8Pid) {
         std::wcerr << "GetProcessId failed on PICO-8 handle: ";
         printLastError();
@@ -204,7 +229,7 @@ int main()
     }
     std::wcout << "PICO-8 PID = " << pico8Pid << std::endl;
 
-    HMODULE pico8Module = findPico8Module(pico8Handle);
+    HMODULE pico8Module = findPico8Module(pico8Process);
     if (!pico8Module) {
         std::wcerr << "Couldn't find a PICO-8 module within the PICO-8 process!" << std::endl;
         return EXIT_FAILURE;
@@ -212,7 +237,7 @@ int main()
     std::wcout << "PICO-8 module = " << pico8Module << std::endl;
 
     MODULEINFO moduleInfo;
-    ok = GetModuleInformation(pico8Handle, pico8Module, &moduleInfo, sizeof MODULEINFO);
+    ok = GetModuleInformation(pico8Process, pico8Module, &moduleInfo, sizeof MODULEINFO);
     if (!ok) {
         std::wcerr << "GetModuleInformation failed on PICO-8 module " << pico8Module << ": ";
         printLastError();
@@ -222,25 +247,99 @@ int main()
     std::wcout << "    SizeOfImage = " << moduleInfo.SizeOfImage << std::endl;
     std::wcout << "    EntryPoint = " << moduleInfo.EntryPoint << std::endl;
 
-    // TODO: read entire module into our process memory with ReadProcessMemory
+    // Read entire module into our process memory.
+    uint8_t* entireModuleBytes = new uint8_t[moduleInfo.SizeOfImage];
+    uint8_t* entireModuleBytesEnd = entireModuleBytes + moduleInfo.SizeOfImage;
+    size_t numBytesRead;
+    ok = ReadProcessMemory(
+        pico8Process,
+        moduleInfo.lpBaseOfDll,
+        entireModuleBytes,
+        moduleInfo.SizeOfImage,
+        &numBytesRead
+    );
+    if (!ok) {
+        std::wcerr << "ReadProcessMemory failed on PICO-8 module " << pico8Module << ": ";
+        printLastError();
+        return EXIT_FAILURE;
+    }
+    if (numBytesRead < moduleInfo.SizeOfImage) {
+        std::wcerr << "ReadProcessMemory read failure: expected " << moduleInfo.SizeOfImage
+            << " bytes, read only " << numBytesRead << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-    // TODO: find offset of Pinput magic bytes 0220c74677ab446ebedc7fd6d277984d within that module
-    //  lpBaseOfDll = 00400000
-    //  SizeOfImage = 5206016
-    //  EntryPoint = 004014C0
-    //  Cheat Engine shows the magic at pico8.exe+45DB9C,
-    //  which is consistent with the above,
-    //  and pico8.exe doesn't appear to use ASLR
+    // Find offset of Pinput magic bytes from base of module.
+    uint8_t* pinputMagicLocation = std::search(
+        entireModuleBytes,
+        entireModuleBytesEnd,
+        pinputMagic,
+        pinputMagic + sizeof pinputMagic
+    );
+    if (pinputMagicLocation == entireModuleBytesEnd) {
+        std::wcerr << "Couldn't find Pinput magic!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    size_t pinputMagicOffset = pinputMagicLocation - entireModuleBytes;
+    std::wcout << "pinputMagicOffset = " << std::hex << pinputMagicOffset << std::endl;
+    delete[] entireModuleBytes;
+    void* pico8GpioStart = (uint8_t*)moduleInfo.lpBaseOfDll + pinputMagicOffset;
+    
+    // Read just the GPIO area.
+    uint8_t gpioBuffer[pico8GpioSize];
+    ok = ReadProcessMemory(
+        pico8Process,
+        pico8GpioStart,
+        gpioBuffer,
+        pico8GpioSize,
+        &numBytesRead
+    );
+    if (!ok) {
+        std::wcerr << "ReadProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
+        printLastError();
+        return EXIT_FAILURE;
+    }
+    if (numBytesRead < pico8GpioSize) {
+        std::wcerr << "ReadProcessMemory (GPIO area only) read failure: expected " << pico8GpioSize
+            << " bytes, read only " << numBytesRead << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-    // TODO: calculate area corresponding to cartridge RAM
+    // Print the GPIO area.
+    for (int line = 0; line < 8; line++) {
+        for (int col = 0; col < 16; col++) {
+            std::wcout << std::setw(2) << std::setfill(L'0') << std::hex;
+            std::wcout << gpioBuffer[line * 16 + col] << " ";
+        }
+        std::wcout << std::endl;
+    }
 
-    // TODO: read only that area in future
-
-    // TODO: try writing back changes with WriteProcessMemory
+    // Zero the magic and write the GPIO buffer back.
+    size_t numBytesWritten;
+    for (int col = 0; col < 16; col++) {
+        gpioBuffer[col] = 0x00;
+    }
+    ok = WriteProcessMemory(
+        pico8Process,
+        pico8GpioStart,
+        gpioBuffer,
+        pico8GpioSize,
+        &numBytesWritten
+    );
+    if (!ok) {
+        std::wcerr << "WriteProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
+        printLastError();
+        return EXIT_FAILURE;
+    }
+    if (numBytesWritten < pico8GpioSize) {
+        std::wcerr << "WriteProcessMemory (GPIO area only) read failure: expected " << pico8GpioSize
+            << " bytes, wrote only " << numBytesRead << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     // TODO: can we get XInput events in a console app?
     
-    ok = CloseHandle(pico8Handle);
+    ok = CloseHandle(pico8Process);
     if (!ok) {
         std::wcerr << "CloseHandle failed on PICO-8 handle: ";
         printLastError();
