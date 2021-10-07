@@ -332,7 +332,7 @@ int main()
         return EXIT_FAILURE;
     }
     if (numBytesWritten < pico8GpioSize) {
-        std::wcerr << "WriteProcessMemory (GPIO area only) read failure: expected " << pico8GpioSize
+        std::wcerr << "WriteProcessMemory (GPIO area only) write failure: expected " << pico8GpioSize
             << " bytes, wrote only " << numBytesRead << "!" << std::endl;
         return EXIT_FAILURE;
     }
