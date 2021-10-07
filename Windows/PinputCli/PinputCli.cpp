@@ -15,6 +15,7 @@
 #include <errhandlingapi.h>
 #include <WinBase.h>
 #include <Shlwapi.h>
+#include <Xinput.h>
 
 constexpr const wchar_t* pico8ExecutableName = L"pico8.exe";
 constexpr const uint8_t pinputMagic[] = {
@@ -211,6 +212,19 @@ HMODULE findPico8Module(HANDLE pico8Process) {
     return NULL;
 }
 
+constexpr uint8_t PINPUT_FLAGS_CONNECTED = 1 << 0;
+constexpr uint8_t PINPUT_FLAGS_HAS_BATTERY = 1 << 1;
+constexpr uint8_t PINPUT_FLAGS_CHARGING = 1 << 2;
+constexpr uint8_t PINPUT_FLAGS_HAS_GUIDE_BUTTON = 1 << 3;
+
+typedef struct _PinputGamepad {
+    uint8_t flags;
+    uint8_t battery;
+    XINPUT_GAMEPAD gamepad;
+    uint8_t loFreqRumble;
+    uint8_t hiFreqRumble;
+} PinputGamepad;
+
 int main()
 {
     BOOL ok;
@@ -337,7 +351,76 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // TODO: can we get XInput events in a console app?
+    PinputGamepad* pinputGamepads = (PinputGamepad*)gpioBuffer;
+    bool connected[XUSER_MAX_COUNT] = { false };
+    DWORD lastPacketNumber[XUSER_MAX_COUNT] = { 0 };
+    DWORD frame = 0;
+    int recheckFrameInterval = 5;
+    // TODO: replace this with an adaptive sleep and a high-res or multimedia timer
+    for (;;) {
+        Sleep(200);
+        for (int player = 0; player < XUSER_MAX_COUNT; player++) {
+            if (connected[player] || frame % recheckFrameInterval == 0) {
+                XINPUT_STATE state;
+                ZeroMemory(&state, sizeof(XINPUT_STATE));
+                DWORD result = XInputGetState(player, &state);
+
+                connected[player] = result == ERROR_SUCCESS;
+                if (!connected[player] || lastPacketNumber[player] == state.dwPacketNumber) {
+                    continue;
+                }
+                
+                lastPacketNumber[player] = state.dwPacketNumber;
+
+                pinputGamepads[player].gamepad = state.Gamepad;
+
+                if (frame % recheckFrameInterval == 0) {
+                    XINPUT_BATTERY_INFORMATION batteryInfo;
+                    ZeroMemory(&batteryInfo, sizeof(XINPUT_BATTERY_INFORMATION));
+                    result = XInputGetBatteryInformation(player, BATTERY_DEVTYPE_GAMEPAD, &batteryInfo);
+
+                    pinputGamepads[player].flags = PINPUT_FLAGS_CONNECTED;
+                    if (batteryInfo.BatteryType != BATTERY_TYPE_WIRED) {
+                        pinputGamepads[player].flags |= PINPUT_FLAGS_HAS_BATTERY;
+                        if (batteryInfo.BatteryLevel == BATTERY_LEVEL_FULL) {
+                            pinputGamepads[player].battery = UINT8_MAX;
+                        }
+                        else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_MEDIUM) {
+                            pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 2 / 3);
+                        }
+                        else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_LOW) {
+                            pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 1 / 3);
+                        }
+                        else {
+                            pinputGamepads[player].battery = 0;
+                        }
+                    }
+                    else {
+                        pinputGamepads[player].battery = 0;
+                    }
+                }
+            }
+        }
+        frame++;
+
+        ok = WriteProcessMemory(
+            pico8Process,
+            pico8GpioStart,
+            gpioBuffer,
+            pico8GpioSize,
+            &numBytesWritten
+        );
+        if (!ok) {
+            std::wcerr << "WriteProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
+            printLastError();
+            return EXIT_FAILURE;
+        }
+        if (numBytesWritten < pico8GpioSize) {
+            std::wcerr << "WriteProcessMemory (GPIO area only) write failure: expected " << pico8GpioSize
+                << " bytes, wrote only " << numBytesWritten << "!" << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
     
     ok = CloseHandle(pico8Process);
     if (!ok) {
