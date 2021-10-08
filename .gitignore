@@ -3,3 +3,4 @@
 /Windows/**/Debug
 /Windows/**/Release
 /Windows/**/*.aps
+/release/artifacts/*.zip

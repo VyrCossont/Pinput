@@ -264,7 +264,7 @@ int main()
     // Read entire module into our process memory.
     uint8_t* entireModuleBytes = new uint8_t[moduleInfo.SizeOfImage];
     uint8_t* entireModuleBytesEnd = entireModuleBytes + moduleInfo.SizeOfImage;
-    size_t numBytesRead;
+    SIZE_T numBytesRead;
     ok = ReadProcessMemory(
         pico8Process,
         moduleInfo.lpBaseOfDll,
@@ -329,7 +329,7 @@ int main()
     }
 
     // Zero the magic and write the GPIO buffer back.
-    size_t numBytesWritten;
+    SIZE_T numBytesWritten;
     for (int col = 0; col < 16; col++) {
         gpioBuffer[col] = 0x00;
     }
