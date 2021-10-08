@@ -68,12 +68,15 @@ struct PinputGamepadButtons: OptionSet {
     static let leftBumper: Self = .init(rawValue: 1 << 8)
     static let rightBumper: Self = .init(rawValue: 1 << 9)
 
-    static let a: Self = .init(rawValue: 1 << 10)
-    static let b: Self = .init(rawValue: 1 << 11)
-    static let x: Self = .init(rawValue: 1 << 12)
-    static let y: Self = .init(rawValue: 1 << 13)
+    static let guide: Self = .init(rawValue: 1 << 10)
 
-    static let guide: Self = .init(rawValue: 1 << 14)
+    /// Does not correspond to any actual buttons.
+    static let reserved: Self = .init(rawValue: 1 << 11)
+
+    static let a: Self = .init(rawValue: 1 << 12)
+    static let b: Self = .init(rawValue: 1 << 13)
+    static let x: Self = .init(rawValue: 1 << 14)
+    static let y: Self = .init(rawValue: 1 << 15)
 
     /// Update based on a specific button changing.
     mutating func update(from gcExtendedGamepad: GCExtendedGamepad, _ gcControllerButtonInput: GCControllerButtonInput) {

@@ -47,11 +47,12 @@ const rightStick = 1 << 7;
 const buttonsHiOffset = 3;
 const leftBumper = 1 << 0;
 const rightBumper = 1 << 1;
-const a = 1 << 2;
-const b = 1 << 3;
-const x = 1 << 4;
-const y = 1 << 5;
-const guide = 1 << 6;
+const guide = 1 << 2;
+const reserved = 1 << 3;
+const a = 1 << 4;
+const b = 1 << 5;
+const x = 1 << 6;
+const y = 1 << 7;
 
 const triggerMax = 0xff;
 const leftTriggerOffset = 4;

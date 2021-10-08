@@ -248,7 +248,7 @@ end
 -- buttons
 
 pi_buttons_offset = 2
-pi_num_buttons = 15
+pi_num_buttons = 16
 
 pi_⬆️ = 0
 pi_⬇️ = 1
@@ -264,14 +264,16 @@ pi_rs = 7
 pi_lb = 8
 pi_rb = 9
 
-pi_a = 10
-pi_🅾️ = pi_a
-pi_b = 11
-pi_❎ = pi_b
-pi_x = 12
-pi_y = 13
+pi_guide = 10
 
-pi_guide = 14
+pi_reserved = 11
+
+pi_a = 12
+pi_🅾️ = pi_a
+pi_b = 13
+pi_❎ = pi_b
+pi_x = 14
+pi_y = 15
 
 -- read a button
 function pi_btn(b, pl)
