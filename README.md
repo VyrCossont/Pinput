@@ -46,7 +46,16 @@ Alternatively check this repo out, run `python3 -m http.server 8080` in the repo
 
 ### PICO-8 development
 
-To add Pinput support to your own cartridge, inspect mine, and take a look at the second tab. All of the functions and constants prefixed with `pi_` are the Pinput client code proper, and you should be able to copy that tab right into your cartridge to use it yourself.
+To add Pinput support to your own cartridge, take a look at [`pinput.lua`](PICO-8/pinput.lua) All of the functions and constants prefixed with `pi_` are the Pinput client code proper, and you can copy or `#include pinput.lua` that code right into your cartridge to use it yourself.
+
+Call `pi_init()` to put the Pinput magic bytes into GPIO so one of the helper apps can find it and start communicating, and call `pi_btn()`, `pi_trigger()`, `pi_axis()`, etc. to read button, trigger, and thumbstick axis values. Note that (as in XInput) trigger values are in the range [0, 255] and axes are in the range [-32768, 32767].
+
+```lua
+-- read player 2's left trigger and scale it to [0, 1]
+local t = pi_trigger(1, pi_lt) / 0xff
+```
+
+Consult [`pinput_tester.p8`](PICO-8/pinput_tester.p8) (the test cartridge) for more usage examples.
 
 ## Current status
 
