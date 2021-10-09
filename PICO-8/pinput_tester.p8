@@ -203,12 +203,12 @@ end
 function _update60()
  lt_dx = pi_trigger(pi_lt, 0) / (0xff / trigger_width)
  rt_dx = pi_trigger(pi_rt, 0) / (0xff / trigger_width)
+ 
+ ls_dx = max(-0x7fff, pi_axis(pi_lx, 0)) / (0x7fff / stick_r)
+ ls_dy = -max(-0x7fff, pi_axis(pi_ly, 0)) / (0x7fff / stick_r)
 
- ls_dx = pi_axis(pi_lx, 0) / (0x7fff / stick_r)
- ls_dy = -pi_axis(pi_ly, 0) / (0x7fff / stick_r)
-
- rs_dx = pi_axis(pi_rx, 0) / (0x7fff / stick_r)
- rs_dy = -pi_axis(pi_ry, 0) / (0x7fff / stick_r)
+ rs_dx = max(-0x7fff, pi_axis(pi_rx, 0)) / (0x7fff / stick_r)
+ rs_dy = -max(-0x7fff, pi_axis(pi_ry, 0)) / (0x7fff / stick_r)
 end
 
 -->8
@@ -248,7 +248,7 @@ end
 -- buttons
 
 pi_buttons_offset = 2
-pi_num_buttons = 16
+pi_num_buttons = 15
 
 pi_⬆️ = 0
 pi_⬇️ = 1
@@ -264,16 +264,14 @@ pi_rs = 7
 pi_lb = 8
 pi_rb = 9
 
-pi_guide = 10
-
-pi_reserved = 11
-
-pi_a = 12
+pi_a = 10
 pi_🅾️ = pi_a
-pi_b = 13
+pi_b = 11
 pi_❎ = pi_b
-pi_x = 14
-pi_y = 15
+pi_x = 12
+pi_y = 13
+
+pi_guide = 14
 
 -- read a button
 function pi_btn(b, pl)
