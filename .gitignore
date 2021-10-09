@@ -3,4 +3,8 @@
 /Windows/**/Debug
 /Windows/**/Release
 /Windows/**/*.aps
-/release/artifacts/*.zip
+
+/macOS/*.app
+/macOS/*.xcarchive
+
+/release/artifacts/*
