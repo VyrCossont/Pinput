@@ -3,7 +3,7 @@
  * Include this module in your exported HTML and call `Pinput.init()`,
  * and it should work the same way as the desktop versions.
  *
- * by @vyrcossont@demon.social
+ * by @vyr@demon.social
  */
 
 const magic = [
