@@ -37,33 +37,33 @@ constexpr const uint8_t pinputMagic[] = {
     0x4d,
 };
 
-constexpr DWORD pico8GpioOffsetFromCartridgeRamBase = 0x5f80;
-constexpr DWORD pico8GpioSize = 0x80;
-constexpr DWORD pico8RegularMemorySize = 0x8000;
-constexpr DWORD pico8ExtendedMemorySize = 0x10000;
+constexpr size_t pico8GpioOffsetFromCartridgeRamBase = 0x5f80;
+constexpr size_t pico8GpioSize = 0x80;
+constexpr size_t pico8RegularMemorySize = 0x8000;
+constexpr size_t pico8ExtendedMemorySize = 0x10000;
 
 /// <summary>
 /// Print the last error from a Windows API function to stderr.
 /// </summary>
 void printLastError() {
     DWORD error = GetLastError();
-    LPWSTR errorMessage = NULL;
+    LPWSTR errorMessage = nullptr;
     DWORD errorMessageSize = FormatMessage(
         FORMAT_MESSAGE_ALLOCATE_BUFFER
         | FORMAT_MESSAGE_FROM_SYSTEM
         | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL,
+        nullptr,
         error,
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPWSTR)&errorMessage,
         0,
-        NULL
+        nullptr
     );
     if (errorMessageSize) {
-        std::wcerr << "We biffed it: " << std::wstring(errorMessage) << std::endl;
+        std::wcerr << std::wstring(errorMessage) << std::endl;
     }
     else {
-        std::wcerr << "We biffed it so badly that FormatMessage failed with error " << GetLastError() << std::endl;
+        std::wcerr << "FormatMessage failed to format error " << error << " with error " << GetLastError() << std::endl;
     }
 }
 
@@ -98,13 +98,13 @@ std::vector<DWORD> listPids() {
 /// <summary>
 /// Find PICO-8.
 /// </summary>
-/// <returns>A handle to a PICO-8 process, or NULL if not found.</returns>
+/// <returns>Handle for a PICO-8 process, or null if not found.</returns>
 HANDLE findPico8Process() {
     auto pids = listPids();
     if (pids.size() == 0) {
         // This shouldn't ever happen except maybe in a sandbox?
         std::wcerr << "Couldn't list any processes!" << std::endl;
-        return NULL;
+        return nullptr;
     }
 
     for (auto& pid : pids) {
@@ -132,11 +132,12 @@ HANDLE findPico8Process() {
         }
         else {
             LPWSTR processExecutableName = PathFindFileName(processExecutablePath);
-            if (PathMatchSpecEx(
+            HRESULT matchStatus = PathMatchSpecEx(
                 processExecutableName,
                 pico8ExecutableName,
                 PMSF_NORMAL
-            ) == S_OK) {
+            );
+            if (matchStatus == S_OK) {
                 return processHandle;
             }
         }
@@ -148,31 +149,34 @@ HANDLE findPico8Process() {
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
 /// <summary>
 /// Find module belonging to PICO-8 executable within its process.
 /// </summary>
-/// <param name="pico8Process">Handle to PICO-8 process.</param>
-/// <returns>Module corresponding to pico8.exe, or NULL if not found.</returns>
+/// <param name="pico8Process">Handle for a PICO-8 process.</param>
+/// <returns>Module corresponding to pico8.exe, or null if not found.</returns>
 HMODULE findPico8Module(HANDLE pico8Process) {
     BOOL ok;
 
+    // Ask for a count of modules in the target process.
     DWORD modulesSizeNeeded;
     ok = EnumProcessModulesEx(
         pico8Process,
-        NULL,
+        nullptr,
         0,
         &modulesSizeNeeded,
         LIST_MODULES_ALL
     );
     if (!ok) {
-        std::wcerr << "EnumProcessModulesEx (no module array) failed on PICO-8 handle: ";
+        std::wcerr << "EnumProcessModulesEx (no module array) failed: ";
         printLastError();
-        return NULL;
+        return nullptr;
     }
     DWORD numModules = modulesSizeNeeded / sizeof HMODULE;
+
+    // Get all modules in the target process.
     HMODULE* modules = new HMODULE[numModules];
     ok = EnumProcessModulesEx(
         pico8Process,
@@ -182,11 +186,10 @@ HMODULE findPico8Module(HANDLE pico8Process) {
         LIST_MODULES_ALL
     );
     if (!ok) {
-        std::wcerr << "EnumProcessModulesEx (with module array) failed on PICO-8 handle: ";
+        std::wcerr << "EnumProcessModulesEx (with module array) failed: ";
         printLastError();
-        return NULL;
+        return nullptr;
     }
-    std::wcout << "Found " << numModules << " modules" << std::endl;
 
     for (DWORD i = 0; i < numModules; i++) {
         auto module = modules[i];
@@ -198,55 +201,34 @@ HMODULE findPico8Module(HANDLE pico8Process) {
             continue;
         }
 
-        if (PathMatchSpecEx(
+        HRESULT matchStatus = PathMatchSpecEx(
             moduleFilename,
             pico8ExecutableName,
             PMSF_NORMAL
-        ) == S_OK) {
+        );
+        if (matchStatus == S_OK) {
             delete[] modules;
             return module;
         }
     }
 
     delete[] modules;
-    return NULL;
+    return nullptr;
 }
 
-constexpr uint8_t PINPUT_FLAGS_CONNECTED = 1 << 0;
-constexpr uint8_t PINPUT_FLAGS_HAS_BATTERY = 1 << 1;
-constexpr uint8_t PINPUT_FLAGS_CHARGING = 1 << 2;
-constexpr uint8_t PINPUT_FLAGS_HAS_GUIDE_BUTTON = 1 << 3;
-
-typedef struct _PinputGamepad {
-    uint8_t flags;
-    uint8_t battery;
-    XINPUT_GAMEPAD gamepad;
-    uint8_t loFreqRumble;
-    uint8_t hiFreqRumble;
-} PinputGamepad;
-
-int main()
-{
+/// <summary>
+/// Look for Pinput magic within a PICO-8 process.
+/// </summary>
+/// <param name="pico8Process">Handle for a PICO-8 process.</param>
+/// <returns>Address within PICO-8 process's address space corresponding
+/// to base of cartridge RAM, or null if not found.</returns>
+uint8_t* findPico8CartridgeRamBase(HANDLE pico8Process) {
     BOOL ok;
-
-    HANDLE pico8Process = findPico8Process();
-    if (!pico8Process) {
-        std::wcerr << "Couldn't find a running PICO-8 process!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    DWORD pico8Pid = GetProcessId(pico8Process);
-    if (!pico8Pid) {
-        std::wcerr << "GetProcessId failed on PICO-8 handle: ";
-        printLastError();
-        return EXIT_FAILURE;
-    }
-    std::wcout << "PICO-8 PID = " << pico8Pid << std::endl;
 
     HMODULE pico8Module = findPico8Module(pico8Process);
     if (!pico8Module) {
         std::wcerr << "Couldn't find a PICO-8 module within the PICO-8 process!" << std::endl;
-        return EXIT_FAILURE;
+        return nullptr;
     }
     std::wcout << "PICO-8 module = " << pico8Module << std::endl;
 
@@ -255,7 +237,7 @@ int main()
     if (!ok) {
         std::wcerr << "GetModuleInformation failed on PICO-8 module " << pico8Module << ": ";
         printLastError();
-        return EXIT_FAILURE;
+        return nullptr;
     }
     std::wcout << "    lpBaseOfDll = " << moduleInfo.lpBaseOfDll << std::endl;
     std::wcout << "    SizeOfImage = " << moduleInfo.SizeOfImage << std::endl;
@@ -273,14 +255,14 @@ int main()
         &numBytesRead
     );
     if (!ok) {
-        std::wcerr << "ReadProcessMemory failed on PICO-8 module " << pico8Module << ": ";
+        std::wcerr << "ReadProcessMemory (findPico8CartridgeRamBase) failed: ";
         printLastError();
-        return EXIT_FAILURE;
+        return nullptr;
     }
     if (numBytesRead < moduleInfo.SizeOfImage) {
-        std::wcerr << "ReadProcessMemory read failure: expected " << moduleInfo.SizeOfImage
+        std::wcerr << "ReadProcessMemory (findPico8CartridgeRamBase) failed: expected " << moduleInfo.SizeOfImage
             << " bytes, read only " << numBytesRead << "!" << std::endl;
-        return EXIT_FAILURE;
+        return nullptr;
     }
 
     // Find offset of Pinput magic bytes from base of module.
@@ -292,96 +274,170 @@ int main()
     );
     if (pinputMagicLocation == entireModuleBytesEnd) {
         std::wcerr << "Couldn't find Pinput magic!" << std::endl;
-        return EXIT_FAILURE;
+        return nullptr;
     }
     size_t pinputMagicOffset = pinputMagicLocation - entireModuleBytes;
     std::wcout << "pinputMagicOffset = " << std::hex << pinputMagicOffset << std::endl;
     delete[] entireModuleBytes;
-    void* pico8GpioStart = (uint8_t*)moduleInfo.lpBaseOfDll + pinputMagicOffset;
     
-    // Read just the GPIO area.
-    uint8_t gpioBuffer[pico8GpioSize];
-    ok = ReadProcessMemory(
-        pico8Process,
-        pico8GpioStart,
-        gpioBuffer,
-        pico8GpioSize,
-        &numBytesRead
-    );
-    if (!ok) {
-        std::wcerr << "ReadProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
-        printLastError();
-        return EXIT_FAILURE;
-    }
-    if (numBytesRead < pico8GpioSize) {
-        std::wcerr << "ReadProcessMemory (GPIO area only) read failure: expected " << pico8GpioSize
-            << " bytes, read only " << numBytesRead << "!" << std::endl;
-        return EXIT_FAILURE;
-    }
+    return (uint8_t*)moduleInfo.lpBaseOfDll + pinputMagicOffset - pico8GpioOffsetFromCartridgeRamBase;
+}
 
-    // Print the GPIO area.
-    for (int line = 0; line < 8; line++) {
-        for (int col = 0; col < 16; col++) {
-            std::wcout << std::setw(2) << std::setfill(L'0') << std::hex;
-            std::wcout << gpioBuffer[line * 16 + col] << " ";
-        }
-        std::wcout << std::endl;
-    }
-
-    // Zero the magic and write the GPIO buffer back.
+/// <summary>
+/// Initialize Pinput by zeroing the GPIO area.
+/// </summary>
+/// <param name="pico8Process">Handle for a PICO-8 process.</param>
+/// <param name="pico8GpioBase">Address within PICO-8 process's
+/// address space corresponding to base of GPIO area.</param>
+/// <returns>True if initialization was successful, false otherwise.</returns>
+bool initPinput(
+    HANDLE pico8Process,
+    uint8_t* pico8GpioBase
+) {
+    // Zero the whole GPIO area.
+    uint8_t pico8GpioBuffer[pico8GpioSize] = {};
     SIZE_T numBytesWritten;
-    for (int col = 0; col < 16; col++) {
-        gpioBuffer[col] = 0x00;
-    }
-    ok = WriteProcessMemory(
+    BOOL ok = WriteProcessMemory(
         pico8Process,
-        pico8GpioStart,
-        gpioBuffer,
+        pico8GpioBase,
+        pico8GpioBuffer,
         pico8GpioSize,
         &numBytesWritten
     );
     if (!ok) {
-        std::wcerr << "WriteProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
+        std::wcerr << "WriteProcessMemory failed: ";
         printLastError();
-        return EXIT_FAILURE;
+        return false;
     }
     if (numBytesWritten < pico8GpioSize) {
-        std::wcerr << "WriteProcessMemory (GPIO area only) write failure: expected " << pico8GpioSize
+        std::wcerr << "WriteProcessMemory failed: expected " << pico8GpioSize
             << " bytes, wrote only " << numBytesWritten << "!" << std::endl;
-        return EXIT_FAILURE;
+        return false;
+    }
+    return true;
+}
+
+enum PinputGamepadFlags : uint8_t {
+    connected = 1 << 0,
+    hasBattery = 1 << 1,
+    charging = 1 << 2,
+    hasGuideButton = 1 << 3,
+};
+
+typedef struct _PinputGamepad {
+    uint8_t flags;
+    uint8_t battery;
+    XINPUT_GAMEPAD gamepad;
+    uint8_t loFreqRumble;
+    uint8_t hiFreqRumble;
+} PinputGamepad;
+
+// Slightly faster than 60 FPS.
+constexpr int frameLengthMs = 16;
+
+// Check disconnected controllers and battery info every this many frames.
+constexpr int recheckFrameInterval = 5;
+
+/// <summary>
+/// Poll XInput for gamepad input changes and write them to PICO-8 in a fast loop.
+/// </summary>
+/// <param name="pico8Process">Handle for a PICO-8 process.</param>
+/// <param name="pico8GpioBase">Address within PICO-8 process's
+/// address space corresponding to base of GPIO area.</param>
+void pollXInput(HANDLE pico8Process, uint8_t* pico8GpioBase) {
+    BOOL ok;
+    
+    uint8_t pico8GpioBuffer[pico8GpioSize] = {};
+
+    PinputGamepad* pinputGamepads = (PinputGamepad*)pico8GpioBuffer;
+    
+    // XInput gamepad connection status.
+    bool connected[XUSER_MAX_COUNT] = {};
+    DWORD lastPacketNumber[XUSER_MAX_COUNT] = {};
+    
+    int frame = 0;
+    
+    // Create a timer that resets every frame.
+    // See https://docs.microsoft.com/en-us/windows/win32/sync/using-waitable-timer-objects
+    HANDLE timer = CreateWaitableTimer(nullptr, false, nullptr);
+    if (!timer) {
+        std::wcerr << "CreateWaitableTimer failed: ";
+        printLastError();
+        return;
+    }
+    LARGE_INTEGER initialWait;
+    initialWait.QuadPart = -10000LL * frameLengthMs;
+    ok = SetWaitableTimer(
+        timer,
+        &initialWait,
+        frameLengthMs,
+        nullptr,
+        nullptr,
+        true
+    );
+    if (!ok) {
+        std::wcerr << "SetWaitableTimer failed: ";
+        printLastError();
+        return;
     }
 
-    PinputGamepad* pinputGamepads = (PinputGamepad*)gpioBuffer;
-    bool connected[XUSER_MAX_COUNT] = { false };
-    DWORD lastPacketNumber[XUSER_MAX_COUNT] = { 0 };
-    DWORD frame = 0;
-    int recheckFrameInterval = 5;
-    // TODO: replace this with an adaptive sleep and a high-res or multimedia timer
     for (;;) {
-        Sleep(200);
+        // If this read fails, the PICO-8 process probably quit.
+        SIZE_T numBytesRead;
+        ok = ReadProcessMemory(
+            pico8Process,
+            pico8GpioBase,
+            pico8GpioBuffer,
+            pico8GpioSize,
+            &numBytesRead
+        );
+        if (!ok) {
+            std::wcerr << "ReadProcessMemory failed: ";
+            printLastError();
+            break;
+        }
+        if (numBytesRead < pico8GpioSize) {
+            std::wcerr << "ReadProcessMemory failed: expected " << pico8GpioSize
+                << " bytes, read only " << numBytesRead << "!" << std::endl;
+            break;
+        }
+
+        // If we see Pinput magic, at startup or after, we need to initialize as if we'd just started up.
+        if (std::equal(pico8GpioBuffer, pico8GpioBuffer + sizeof pinputMagic, pinputMagic)) {
+            initPinput(pico8Process, pico8GpioBase);
+            frame = 0;
+            for (int player = 0; player < XUSER_MAX_COUNT; player++) {
+                connected[player] = false;
+                lastPacketNumber[player] = 0;
+            }
+            // TODO: switch off currently playing rumble
+        }
+
+        bool recheck = frame == 0;
         for (int player = 0; player < XUSER_MAX_COUNT; player++) {
-            if (connected[player] || frame % recheckFrameInterval == 0) {
-                XINPUT_STATE state;
-                ZeroMemory(&state, sizeof(XINPUT_STATE));
+            if (connected[player] || recheck) {
+                XINPUT_STATE state = {};
                 DWORD result = XInputGetState(player, &state);
 
                 connected[player] = result == ERROR_SUCCESS;
+
+                // TODO: handle rumble based on what we read from GPIO
+
                 if (!connected[player] || lastPacketNumber[player] == state.dwPacketNumber) {
                     continue;
                 }
-                
+
                 lastPacketNumber[player] = state.dwPacketNumber;
 
                 pinputGamepads[player].gamepad = state.Gamepad;
 
-                if (frame % recheckFrameInterval == 0) {
-                    XINPUT_BATTERY_INFORMATION batteryInfo;
-                    ZeroMemory(&batteryInfo, sizeof(XINPUT_BATTERY_INFORMATION));
+                if (recheck) {
+                    XINPUT_BATTERY_INFORMATION batteryInfo = {};
                     result = XInputGetBatteryInformation(player, BATTERY_DEVTYPE_GAMEPAD, &batteryInfo);
 
-                    pinputGamepads[player].flags = PINPUT_FLAGS_CONNECTED;
+                    pinputGamepads[player].flags = PinputGamepadFlags::connected;
                     if (batteryInfo.BatteryType != BATTERY_TYPE_WIRED) {
-                        pinputGamepads[player].flags |= PINPUT_FLAGS_HAS_BATTERY;
+                        pinputGamepads[player].flags |= PinputGamepadFlags::hasBattery;
                         if (batteryInfo.BatteryLevel == BATTERY_LEVEL_FULL) {
                             pinputGamepads[player].battery = UINT8_MAX;
                         }
@@ -401,33 +457,137 @@ int main()
                 }
             }
         }
-        frame++;
+        frame = (frame + 1) % recheckFrameInterval;
 
+        // If this write fails, the PICO-8 process probably quit.
+        SIZE_T numBytesWritten;
         ok = WriteProcessMemory(
             pico8Process,
-            pico8GpioStart,
-            gpioBuffer,
+            pico8GpioBase,
+            pico8GpioBuffer,
             pico8GpioSize,
             &numBytesWritten
         );
         if (!ok) {
-            std::wcerr << "WriteProcessMemory (GPIO area only) failed on PICO-8 module " << pico8Module << ": ";
+            std::wcerr << "WriteProcessMemory failed: ";
+            printLastError();
+            break;
+        }
+        if (numBytesWritten < pico8GpioSize) {
+            std::wcerr << "WriteProcessMemory failed: expected " << pico8GpioSize
+                << " bytes, wrote only " << numBytesWritten << "!" << std::endl;
+            break;
+        }
+
+        // Wait for the timer.
+        DWORD waitStatus = WaitForSingleObject(timer, INFINITE);
+        if (waitStatus == WAIT_FAILED) {
+            std::wcerr << "WaitForSingleObject failed for timer: ";
+            printLastError();
+        }
+    }
+
+    ok = CloseHandle(timer);
+    if (!ok) {
+        std::wcerr << "CloseHandle failed for timer: ";
+        printLastError();
+    }
+}
+
+constexpr int scanIntervalMs = 1000;
+
+int main()
+{
+    BOOL ok;
+    HRESULT hr;
+
+    // We pulled in COM somewhere and need to initialize it.
+    // Otherwise the debugger shows "CoInitialize has not been called" exceptions.
+    hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (hr != S_OK) {
+        goto comShutdown;
+    }
+
+    {
+        // Create a timer that resets every scan interval.
+        // See https://docs.microsoft.com/en-us/windows/win32/sync/using-waitable-timer-objects
+        HANDLE timer = CreateWaitableTimer(nullptr, false, nullptr);
+        if (!timer) {
+            std::wcerr << "CreateWaitableTimer failed: ";
             printLastError();
             return EXIT_FAILURE;
         }
-        if (numBytesWritten < pico8GpioSize) {
-            std::wcerr << "WriteProcessMemory (GPIO area only) write failure: expected " << pico8GpioSize
-                << " bytes, wrote only " << numBytesWritten << "!" << std::endl;
+        LARGE_INTEGER initialWait;
+        initialWait.QuadPart = -10000LL * scanIntervalMs;
+        ok = SetWaitableTimer(
+            timer,
+            &initialWait,
+            scanIntervalMs,
+            nullptr,
+            nullptr,
+            true
+        );
+        if (!ok) {
+            std::wcerr << "SetWaitableTimer failed: ";
+            printLastError();
             return EXIT_FAILURE;
         }
+
+        for (;;) {
+            HANDLE pico8Process = findPico8Process();
+            if (!pico8Process) {
+                std::wcerr << "Couldn't find a running PICO-8 process!" << std::endl;
+                goto waitForTimer;
+            }
+
+            {
+                DWORD pico8Pid = GetProcessId(pico8Process);
+                if (!pico8Pid) {
+                    std::wcerr << "GetProcessId failed on PICO-8 handle: ";
+                    printLastError();
+                    goto closePico8Process;
+                }
+                std::wcout << "PICO-8 PID = " << pico8Pid << std::endl;
+
+                {
+                    // Memory offset in PICO-8 process's address space, not ours.
+                    uint8_t* pico8CartridgeRamBase = findPico8CartridgeRamBase(pico8Process);
+                    if (!pico8CartridgeRamBase) {
+                        std::wcerr << "Couldn't find Pinput magic in PICO-8 process with PID " << pico8Pid << "!" << std::endl;
+                        goto closePico8Process;
+                    }
+
+                    {
+                        uint8_t* pico8GpioBase = pico8CartridgeRamBase + pico8GpioOffsetFromCartridgeRamBase;
+                        pollXInput(pico8Process, pico8GpioBase);
+                    }
+                }
+
+            closePico8Process:
+                ok = CloseHandle(pico8Process);
+                if (!ok) {
+                    std::wcerr << "CloseHandle failed for PID " << pico8Pid << ": ";
+                    printLastError();
+                }
+            }
+
+        waitForTimer:
+            DWORD waitStatus = WaitForSingleObject(timer, INFINITE);
+            if (waitStatus == WAIT_FAILED) {
+                std::wcerr << "WaitForSingleObject failed for timer: ";
+                printLastError();
+            }
+        }
+
+        ok = CloseHandle(timer);
+        if (!ok) {
+            std::wcerr << "CloseHandle failed for timer: ";
+            printLastError();
+        }
     }
-    
-    ok = CloseHandle(pico8Process);
-    if (!ok) {
-        std::wcerr << "CloseHandle failed on PICO-8 handle: ";
-        printLastError();
-        return EXIT_FAILURE;
-    }
+
+comShutdown:
+    CoUninitialize();
     
     return EXIT_SUCCESS;
 }

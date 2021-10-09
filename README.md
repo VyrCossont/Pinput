@@ -16,13 +16,33 @@ Once both the app and the cartridge are running, the cartridge should switch fro
 
 The app displays the process ID of whatever PICO-8 process it found that has the Pinput magic in its GPIO area, and also the name of the gamepad being used by player 1. If you don't see a gamepad, make sure yours is actually on.
 
+### Windows
+
+Download the latest release for your version of Windows from this Github project, and run it in your console. It will print `Couldn't find a running PICO-8 process!` every second.
+
+Now open PICO-8. The console app should switch to printing something like this (the numbers may be different), indicating that it has found PICO-8 but that Pinput has not yet been initialized by the cartridge:
+
+```
+PICO-8 PID = 4260
+PICO-8 module = 0000000000400000
+    lpBaseOfDll = 0000000000400000
+    SizeOfImage = 5206016
+    EntryPoint = 00000000004014C0
+Couldn't find Pinput magic!
+Couldn't find Pinput magic in PICO-8 process with PID 4260!
+```
+
+Load and run a Pinput-enabled cartridge. The console app should print a final `pinputMagicOffset = 45db9c` (or some similar number) and your gamepad should start working in PICO-8.
+
+The Windows version should not need or ask for any permissions not normally granted by Windows.
+
 ### web
 
 Include the `web/pinput.js` module in your [exported web cartridge](https://www.lexaloffle.com/dl/docs/pico-8_manual.html#Web_Applications_) somehow, and call its `.init()` method. The same client code will work with both desktop and web versions.
 
 Want to try it right now? Connect a gamepad and [run the gamepad test cartridge in your browser](https://vyrcossont.github.io/Pinput).
 
-Alternatively check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/PICO-8/docs/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
+Alternatively check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/docs/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
 
 ### PICO-8 development
 
@@ -38,6 +58,12 @@ The current implementation has been tested with macOS 11.6 on Intel hardware onl
 
 Controller-wise, I've tested it with an Xbox Wireless Controller with Bluetooth (model 1708) and a DualShock 4 (model CUH-ZCT2), but it should work with any controller supported by Apple's Game Controller API. (Check [Apple's pairing instructions](https://support.apple.com/en-us/HT210414) if you get stuck.) Note that this does _not_ include vanilla USB or Bluetooth HID gamepads, or classic XInput devices like 360 gamepads.
 
+### Windows
+
+Supports reading all buttons, sticks, triggers, and the battery level, from up to 4 XInput controllers. Non-XInput controllers are not supported yet.
+
+The current implementation has been tested on Windows 10 Build 19042 and an x64 (aka amd64) machine, with both the x86 and x64 release builds of the Pinput console app. It may or may not run on older versions of Windows. It doesn't use anything newer than Vista's version of XInput, so it should be portable to older versions, but I don't have any older machines to test on.
+
 ### web
 
 Supports reading all buttons, sticks, and triggers. No battery information is available through the Web Gamepad API, so that doesn't work.
@@ -51,7 +77,7 @@ The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for m
 ## Future goals
 
 - Rumble support
-- Windows helper app
+- Windows GUI helper app
 - Linux helper app
 
 ## Development notes
