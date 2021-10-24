@@ -5,6 +5,7 @@ use sysinfo::{System, SystemExt, Process, ProcessExt, RefreshKind};
 use std::path::Path;
 use plist;
 use std::ffi::OsStr;
+use proc_maps::MapRange;
 use serde::Deserialize;
 
 #[cfg(windows)]
@@ -17,26 +18,37 @@ static PICO8_EXECUTABLE_NAME: &str = "pico8";
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct InfoPlist {
+    c_f_bundle_executable: String,
     c_f_bundle_identifier: String,
 }
 
-/// Assume the path is for an executable inside a macOS app bundle.
-/// Get the bundle ID for that bundle.
-fn get_bundle_id(path: &Path) -> Option<String> {
-    let app = path.ancestors()
-        .find(|path| path.extension() == Some(OsStr::new("app")) )?;
-    let info_plist_path = app.join("Contents/Info.plist");
-    let info_plist: InfoPlist = plist::from_file(info_plist_path).ok()?;
-    Some(info_plist.c_f_bundle_identifier)
+/// If this file is inside a macOS app bundle, return the path to that bundle.
+fn get_app_bundle(path: &Path) -> Option<&Path> {
+    path.ancestors().find(|path| path.extension() == Some(OsStr::new("app")))
+}
+
+/// Assume the path is for a macOS app bundle.
+/// Load the `Info.plist` for that bundle.
+fn get_info_plist(path: &Path) -> Option<InfoPlist> {
+    plist::from_file(path.join("Contents/Info.plist")).ok()
 }
 
 /// Detect both PICO-8 and standalone cartridges.
 fn is_pico8_exe(path: &Path) -> bool {
     if path.ends_with(PICO8_EXECUTABLE_NAME) {
         true
-    } else if let Some(bundle_id) = get_bundle_id(path) {
+    } else if let Some(app_bundle_path) = get_app_bundle(path) {
         // TODO: run this check only on macOS
-        bundle_id == "com.lexaloffle.pico8" || bundle_id.starts_with("com.pico8_author.")
+        if let Some(info_plist) = get_info_plist(app_bundle_path) {
+            let in_pico8_bundle = info_plist.c_f_bundle_identifier == "com.lexaloffle.pico8"
+                || info_plist.c_f_bundle_identifier.starts_with("com.pico8_author.");
+            let bundle_executable_path = app_bundle_path
+                .join("Contents/MacOS")
+                .join(info_plist.c_f_bundle_executable);
+            in_pico8_bundle && path == bundle_executable_path
+        } else {
+            false
+        }
     } else {
         // PICO-8 on Windows doesn't use the PE `VERSIONINFO` resource that is the closest
         // equivalent of `Info.plist`, either in the regular PICO-8 binary or standalone cartridges,
@@ -49,6 +61,13 @@ fn is_pico8_exe(path: &Path) -> bool {
 
 fn is_pico8_process(process: &Process) -> bool {
     is_pico8_exe(process.exe())
+}
+
+fn is_pico8_memory_region(map: &MapRange) -> bool {
+    map.is_read() && map.is_write() && !map.is_exec()
+        && map.filename().as_ref().map_or(false, |path| {
+            is_pico8_exe(Path::new(path.as_str()))
+        })
 }
 
 fn main() {
@@ -83,7 +102,7 @@ fn main() {
     // TODO: need to be root or in an entitled binary to do this on macOS
     // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
     let maps = proc_maps::get_process_maps(pico8_pid).expect("Couldn't map PICO-8!");
-    for map in maps {
+    for map in maps.iter().filter(|map| is_pico8_memory_region(*map)) {
         println!(
             "{}+{}: [{}{}{}] {}",
             map.start(),
