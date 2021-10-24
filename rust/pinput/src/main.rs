@@ -7,6 +7,9 @@ use plist;
 use std::ffi::OsStr;
 use proc_maps::MapRange;
 use serde::Deserialize;
+use process_memory;
+use process_memory::TryIntoProcessHandle;
+use memchr::memmem;
 
 #[cfg(windows)]
 static PICO8_EXECUTABLE_NAME: &str = "pico8.exe";
@@ -63,11 +66,41 @@ fn is_pico8_process(process: &Process) -> bool {
     is_pico8_exe(process.exe())
 }
 
-fn is_pico8_memory_region(map: &MapRange) -> bool {
+fn is_pico8_data_segment(map: &MapRange) -> bool {
     map.is_read() && map.is_write() && !map.is_exec()
         && map.filename().as_ref().map_or(false, |path| {
             is_pico8_exe(Path::new(path.as_str()))
         })
+}
+
+static PINPUT_MAGIC: [u8; 16] = [
+    0x02,
+    0x20,
+    0xc7,
+    0x46,
+    0x77,
+    0xab,
+    0x44,
+    0x6e,
+    0xbe,
+    0xdc,
+    0x7f,
+    0xd6,
+    0xd2,
+    0x77,
+    0x98,
+    0x4d,
+];
+
+/// Return offset from memory region's base of Pinput magic.
+fn find_pinput_magic(pid: process_memory::Pid, map: &MapRange) -> Option<usize> {
+    let handle = pid.try_into_process_handle().ok()?;
+    let data = process_memory::copy_address(
+        map.start(),
+        map.size(),
+        &handle,
+    ).ok()?;
+    memmem::find(&data, &PINPUT_MAGIC)
 }
 
 fn main() {
@@ -102,15 +135,16 @@ fn main() {
     // TODO: need to be root or in an entitled binary to do this on macOS
     // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
     let maps = proc_maps::get_process_maps(pico8_pid).expect("Couldn't map PICO-8!");
-    for map in maps.iter().filter(|map| is_pico8_memory_region(*map)) {
+    for map in maps.iter().filter(|map| is_pico8_data_segment(*map)) {
         println!(
-            "{}+{}: [{}{}{}] {}",
+            "{}+{}:",
             map.start(),
             map.size(),
-            if map.is_read() { "r" } else { "-" },
-            if map.is_write() { "w" } else { "-" },
-            if map.is_exec() { "x" } else { "-" },
-            map.filename().as_ref().unwrap_or(&"???".to_string())
         );
+        if let Some(offset) = find_pinput_magic(pico8_pid as process_memory::Pid, map) {
+            println!("    Pinput magic @ {}", offset);
+        } else {
+            println!("    Pinput magic not found");
+        }
     }
 }

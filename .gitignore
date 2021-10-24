@@ -7,4 +7,6 @@
 /macOS/*.app
 /macOS/*.xcarchive
 
+/rust/pinput/target
+
 /release/artifacts/*
