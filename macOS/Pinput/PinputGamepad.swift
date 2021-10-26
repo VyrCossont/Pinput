@@ -242,7 +242,7 @@ struct PinputGamepad {
         rightTrigger = UInt8(gcExtendedGamepad.rightTrigger.value * Float(UInt8.max))
 
         leftStickX = Int16(gcExtendedGamepad.leftThumbstick.xAxis.value * Float(Int16.max))
-        leftStickY = Int16(gcExtendedGamepad.leftThumbstick.xAxis.value * Float(Int16.max))
+        leftStickY = Int16(gcExtendedGamepad.leftThumbstick.yAxis.value * Float(Int16.max))
 
         rightStickX = Int16(gcExtendedGamepad.rightThumbstick.xAxis.value * Float(Int16.max))
         rightStickY = Int16(gcExtendedGamepad.rightThumbstick.yAxis.value * Float(Int16.max))
