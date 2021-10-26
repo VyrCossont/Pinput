@@ -8,7 +8,7 @@ struct PinputGamepadFlags: OptionSet {
     static let connected: Self = .init(rawValue: 1 << 0)
 
     /// This gamepad has a battery.
-    /// If this is true, the `battery` field and the `isCharging` flag may be non-zero.
+    /// If this is true, the `battery` field and the `charging` flag may be non-zero.
     static let hasBattery: Self = .init(rawValue: 1 << 1)
 
     /// This gamepad is currently charging its battery.
@@ -50,7 +50,7 @@ extension PinputGamepadFlags {
 
 /// Flags field indicating which buttons are currently pressed.
 /// Same as <https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad>
-/// with the addition of a guide button after all of the other buttons.
+/// with the addition of a guide button in the lowest unused bit.
 struct PinputGamepadButtons: OptionSet {
     let rawValue: UInt16
 
@@ -70,7 +70,7 @@ struct PinputGamepadButtons: OptionSet {
 
     static let guide: Self = .init(rawValue: 1 << 10)
 
-    /// Does not correspond to any actual buttons.
+    /// Does not correspond to any actual button.
     static let reserved: Self = .init(rawValue: 1 << 11)
 
     static let a: Self = .init(rawValue: 1 << 12)
