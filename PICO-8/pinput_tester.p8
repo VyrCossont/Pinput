@@ -8,6 +8,8 @@ function _init()
  pi_init()
 end
 
+trigger_rumble = true
+
 ls_center_x = 32
 ls_center_y = 48
 ls_dx = 0
@@ -201,8 +203,16 @@ function _draw()
 end
 
 function _update60()
- lt_dx = pi_trigger(pi_lt, 0) / (0xff / trigger_width)
- rt_dx = pi_trigger(pi_rt, 0) / (0xff / trigger_width)
+ local lt = pi_trigger(pi_lt, 0)
+ local rt = pi_trigger(pi_rt, 0)
+ 
+ if pi_is_inited() and trigger_rumble then
+  --pi_rumble(pi_lo, lt, 0)
+  --pi_rumble(pi_hi, rt, 0)
+ end
+ 
+ lt_dx = lt / (0xff / trigger_width)
+ rt_dx = rt / (0xff / trigger_width)
  
  ls_dx = max(-0x7fff, pi_axis(pi_lx, 0)) / (0x7fff / stick_r)
  ls_dy = -max(-0x7fff, pi_axis(pi_ly, 0)) / (0x7fff / stick_r)

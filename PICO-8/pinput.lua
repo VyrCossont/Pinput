@@ -66,7 +66,7 @@ function pi_btn(b, pl)
  pl = pl or 0
  if pl < 0 or pl >= pi_num_players
  or b < 0 or b >= pi_num_buttons then
-  return 0
+  assert(false, 'pi_btn: parameter out of range')
  end
  
  local buttons = %(pi_gpio
@@ -90,7 +90,7 @@ function pi_trigger(t, pl)
  pl = pl or 0
  if pl < 0 or pl >= pi_num_players
  or t < 0 or t >= pi_num_triggers then
-  return 0
+  assert(false, 'pi_trigger: parameter out of range')
  end
  
  return @(pi_gpio
@@ -115,7 +115,7 @@ function pi_axis(a, pl)
  pl = pl or 0
  if pl < 0 or pl >= pi_num_players
  or a < 0 or a >= pi_num_axes then
-  return 0
+  assert(false, 'pi_axis: parameter out of range')
  end
  
  return %(pi_gpio
@@ -124,9 +124,36 @@ function pi_axis(a, pl)
   + a * pi_axis_stride)
 end
 
+-- rumble
+
+pi_rumble_offset = 14
+pi_rumble_stride = 1
+pi_num_rumbles = 2
+
+pi_lo = 0
+pi_hi = 1
+
+-- note: this writes rumble,
+-- instead of reading it
+function pi_rumble(r, v, pl)
+ pl = pl or 0
+ if pl < 0 or pl >= pi_num_players
+ or r < 0 or r >= pi_num_rumbles
+ or v < 0x00 or v > 0xff
+ or v % 1 != 0 then
+  assert(false, 'pi_rumble: parameter out of range')
+ end
+
+ poke(pi_gpio
+  + pl * pi_gamepad_stride
+  + pi_rumble_offset
+  + r * pi_rumble_stride,
+  v
+ )
+end
+
 -- todo:
 
 -- gamepad capabilities
 -- gamepad count
--- rumble
 -- battery/charging status

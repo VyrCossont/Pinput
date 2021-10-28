@@ -1,4 +1,5 @@
 import Combine
+import CoreHaptics
 import GameController
 
 /// UI-friendly plumbing between a collection of extended gamepads and a PICO-8 connection.
@@ -57,6 +58,7 @@ class Gamepads: ObservableObject {
 
     /// Persistent indexes so that the gamepads don't renumber if someone disconnects theirs during play.
     internal var registeredGamepads: [GCExtendedGamepad?] = Array(repeating: nil, count: pinputMaxGamepads)
+    internal var hapticEngines: [(CHHapticEngine, CHHapticPattern, CHHapticPatternPlayer, CHHapticEngine, CHHapticPattern, CHHapticPatternPlayer)?] = Array(repeating: nil, count: pinputMaxGamepads)
 
     /// Constructor for SwiftUI previews.
     init(preview: String) {
@@ -92,7 +94,7 @@ class Gamepads: ObservableObject {
             }
 
         periodicTasks = Timer.TimerPublisher(
-            interval: 1,
+            interval: 0.016,
             runLoop: .current,
             mode: .default
         )
@@ -119,6 +121,51 @@ class Gamepads: ObservableObject {
             for (i, maybeGcExtendedGamepad) in self.registeredGamepads.enumerated() {
                 guard let battery = maybeGcExtendedGamepad?.controller?.battery else { continue }
                 self.pinputGamepads?[i].update(from: battery)
+            }
+
+            // Update rumble.
+            for (i, maybeHapticEngines) in self.hapticEngines.enumerated() {
+                // This mapping assumes that the left handle rumble motor is the low-frequency one,
+                // and the right handle rumble motor is the high-frequency one.
+                // This is XInput's assumption and probably holds for all Xbox controllers.
+                // It also holds for the DualShock 4 (at least).
+                // It's even mentioned in Apple examples, so maybe most controllers use this convention.
+                guard let (_, _, leftPlayer, _, _, rightPlayer) = maybeHapticEngines,
+                      let leftIntensityRaw = self.pinputGamepads?[i].loFreqRumble,
+                      let rightIntensityRaw = self.pinputGamepads?[i].hiFreqRumble
+                else { continue }
+
+                if leftIntensityRaw == 0 {
+                    try? leftPlayer.stop(atTime: .zero)
+                } else {
+                    let leftIntensity = Float(leftIntensityRaw) / Float(UInt8.max)
+                    try? leftPlayer.start(atTime: .zero)
+                    try? leftPlayer.sendParameters(
+                        [
+                            CHHapticDynamicParameter(
+                                parameterID: .hapticIntensityControl,
+                                value: leftIntensity,
+                                relativeTime: .zero)
+                        ],
+                        atTime: .zero
+                    )
+                }
+
+                if rightIntensityRaw == 0 {
+                    try? rightPlayer.stop(atTime: .zero)
+                } else {
+                    let rightIntensity = Float(rightIntensityRaw) / Float(UInt8.max)
+                    try? rightPlayer.start(atTime: .zero)
+                    try? rightPlayer.sendParameters(
+                        [
+                            CHHapticDynamicParameter(
+                                parameterID: .hapticIntensityControl,
+                                value: rightIntensity,
+                                relativeTime: .zero)
+                        ],
+                        atTime: .zero
+                    )
+                }
             }
         }
     }
@@ -155,6 +202,53 @@ class Gamepads: ObservableObject {
                 gcExtendedGamepad.valueChangedHandler = gamepadValueChanged(_:gcControllerElement:)
                 registeredGamepads[i] = gcExtendedGamepad
                 updateGamepadState(at: i, gcExtendedGamepad)
+                // TODO: factor this out and make it neat
+                if let haptics = gcExtendedGamepad.controller?.haptics,
+                    haptics.supportedLocalities.contains(.leftHandle),
+                    haptics.supportedLocalities.contains(.rightHandle),
+                    let leftPattern = try? CHHapticPattern(
+                        events: [
+                            CHHapticEvent(
+                                eventType: .hapticContinuous,
+                                parameters: [
+                                    CHHapticEventParameter(
+                                        parameterID: .hapticIntensity,
+                                        value: 1.0
+                                    )
+                                ],
+                                relativeTime: .zero,
+                                duration: .init(GCHapticDurationInfinite)
+                            )
+                        ],
+                        parameters: []
+                    ),
+                    let rightPattern = try? CHHapticPattern(
+                        events: [
+                            CHHapticEvent(
+                                eventType: .hapticContinuous,
+                                parameters: [
+                                    CHHapticEventParameter(
+                                        parameterID: .hapticIntensity,
+                                        value: 1.0
+                                    )
+                                ],
+                                relativeTime: .zero,
+                                duration: .init(GCHapticDurationInfinite)
+                            )
+                        ],
+                        parameters: []
+                    ),
+                    let leftEngine = haptics.createEngine(withLocality: .leftHandle),
+                    let rightEngine = haptics.createEngine(withLocality: .rightHandle),
+                    let leftPlayer = try? leftEngine.makePlayer(with: leftPattern),
+                    let rightPlayer = try? rightEngine.makePlayer(with: rightPattern) {
+                    try? leftEngine.start()
+                    try? rightEngine.start()
+                    hapticEngines[i] = (leftEngine, leftPattern, leftPlayer, rightEngine, rightPattern, rightPlayer)
+                } else {
+                    hapticEngines[i] = nil
+                    logger.log("Gamepad does not support the haptics we expect: \(gcExtendedGamepad, privacy: .public)")
+                }
                 return
             }
         }
@@ -174,6 +268,11 @@ class Gamepads: ObservableObject {
                 gcExtendedGamepad.valueChangedHandler = nil
                 registeredGamepads[i] = nil
                 clearGamepadState(at: i)
+                if let (leftEngine, _, _, rightEngine, _, _) = hapticEngines[i] {
+                    leftEngine.stop(completionHandler: nil)
+                    rightEngine.stop(completionHandler: nil)
+                }
+                hapticEngines[i] = nil
                 return
             }
         }
