@@ -124,7 +124,7 @@ fn main() -> Result<(), Error> {
             // TODO: test rumble
             game_controller.set_rumble(
                 ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
-                ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
+                ((gamepad.hi_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
                 frame_duration.num_milliseconds() as u32
             )?;
 
