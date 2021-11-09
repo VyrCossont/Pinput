@@ -31,9 +31,6 @@ pub enum Error {
     #[error("couldn't read `Info.plist` from app bundle")]
     Plist(#[from] plist::Error),
 
-    #[error("memory map region has no associated filename")]
-    NoFilenameForMap,
-
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
 }
@@ -109,11 +106,24 @@ fn is_pico8_process(process: &Process) -> Result<bool, Error> {
     is_pico8_exe(process.exe())
 }
 
+#[cfg(not(target_os = "linux"))]
 fn is_pico8_data_segment(map: &MapRange) -> Result<bool, Error> {
     let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
-    let path = map.filename().as_ref().ok_or(Error::NoFilenameForMap)?;
-    let map_is_from_pico8_executable = is_pico8_exe(Path::new(&path))?;
+    let map_is_from_pico8_executable: bool;
+    if let Some(path) = map.filename() {
+        map_is_from_pico8_executable = is_pico8_exe(Path::new(&path))?;
+    } else {
+        map_is_from_pico8_executable = false;
+    }
     Ok(map_permissions_rw_only && map_is_from_pico8_executable)
+}
+
+/// On Linux (at least the amd64 version),
+/// the area of memory containing `pstate` is an anonymous mapping.
+#[cfg(target_os = "linux")]
+fn is_pico8_data_segment(map: &MapRange) -> Result<bool, Error> {
+    let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
+    Ok(map_permissions_rw_only && map.filename().is_none())
 }
 
 /// Return offset of Pinput magic from memory region's base.
@@ -165,9 +175,12 @@ impl Pico8Connection {
 
         // TODO: need to be root or in an entitled binary to do this on macOS
         // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
+        // TODO: need `setcap cap_sys_ptrace=eip pinput` to do this on Linux
         let gpio_address = proc_maps::get_process_maps(pico8_pid)?.into_iter()
             .filter(|map| is_pico8_data_segment(map).unwrap_or(false))
             .flat_map(|map| {
+                // TODO: some permission errors should probably break out of this,
+                //  since that might mean we don't have the right entitlement or capability.
                 let offset = find_pinput_magic(&pico8_handle, &map).ok()?;
                 Some(map.start() + offset)
             })
