@@ -1,6 +1,6 @@
 use sysinfo;
 use proc_maps;
-use sysinfo::{System, SystemExt, Process, ProcessExt, RefreshKind};
+use sysinfo::{AsU32, System, SystemExt, Process, ProcessExt, RefreshKind};
 use std::path::{Path, PathBuf};
 use plist;
 use std::ffi::OsStr;
@@ -166,11 +166,13 @@ impl Pico8Connection {
             RefreshKind::new().with_processes()
         );
 
-        let pico8_pid = *system.processes().iter()
+        let pico8_pid: Pid = system.processes().iter()
             .filter(|(_, process)| is_pico8_process(process).unwrap_or(false))
             .next()
             .ok_or(Error::NoPico8ProcessesFound)?
-            .0;
+            .0
+            .as_u32()
+            as Pid;
         let pico8_handle = pico8_pid.try_into_process_handle()?;
 
         // TODO: need to be root or in an entitled binary to do this on macOS
