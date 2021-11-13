@@ -85,7 +85,7 @@ fn main() -> Result<(), Error> {
     // TODO: handle getting disconnected when the process dies,
     //  and reconnecting when a new one shows up.
     let pico8_connection = Pico8Connection::try_new()?;
-    println!("connected: {:#?}", pico8_connection);
+    println!("connected: PID {}", pico8_connection.pid);
 
     let frame_duration = Duration::microseconds(16667);
     let (timer_tx, timer_rx) = channel();
@@ -157,7 +157,9 @@ fn main() -> Result<(), Error> {
             let mut buttons = PinputGamepadButtons::default();
             for button in SDL_GAME_CONTROLLER_BUTTONS {
                 if game_controller.button(button) {
-                    buttons.insert(PinputGamepadButtons::from(button))
+                    if let Ok(button) = PinputGamepadButtons::try_from(button) {
+                        buttons.insert(button);
+                    }
                 }
             }
             gamepad.buttons = buttons;

@@ -55,7 +55,7 @@ bitflags! {
 
         const GUIDE = 1 << 10;
 
-        /// Does not correspond to any actual button.
+        // TODO: change this to MISC1 everywhere. SDL supports a 16th now.
         const RESERVED = 1 << 11;
 
         const A = 1 << 12;
@@ -65,24 +65,34 @@ bitflags! {
     }
 }
 
-impl From<Button> for PinputGamepadButtons {
-    fn from(button: Button) -> Self {
+#[derive(thiserror::Error, Debug)]
+pub enum PinputGamepadButtonsError {
+    #[error("Unsupported SDL button: {0:#?}")]
+    Unsupported(Button),
+}
+
+impl TryFrom<Button> for PinputGamepadButtons {
+    type Error = PinputGamepadButtonsError;
+
+    fn try_from(button: Button) -> Result<Self, Self::Error> {
         match button {
-            Button::A => Self::A,
-            Button::B => Self::B,
-            Button::X => Self::X,
-            Button::Y => Self::Y,
-            Button::Back => Self::BACK,
-            Button::Guide => Self::GUIDE,
-            Button::Start => Self::START,
-            Button::LeftStick => Self::LEFT_STICK,
-            Button::RightStick => Self::RIGHT_STICK,
-            Button::LeftShoulder => Self::LEFT_BUMPER,
-            Button::RightShoulder => Self::RIGHT_BUMPER,
-            Button::DPadUp => Self::DPAD_UP,
-            Button::DPadDown => Self::DPAD_DOWN,
-            Button::DPadLeft => Self::DPAD_LEFT,
-            Button::DPadRight => Self::DPAD_RIGHT,
+            Button::A => Ok(Self::A),
+            Button::B => Ok(Self::B),
+            Button::X => Ok(Self::X),
+            Button::Y => Ok(Self::Y),
+            Button::Back => Ok(Self::BACK),
+            Button::Guide => Ok(Self::GUIDE),
+            Button::Start => Ok(Self::START),
+            Button::Misc1 => Ok(Self::RESERVED),
+            Button::LeftStick => Ok(Self::LEFT_STICK),
+            Button::RightStick => Ok(Self::RIGHT_STICK),
+            Button::LeftShoulder => Ok(Self::LEFT_BUMPER),
+            Button::RightShoulder => Ok(Self::RIGHT_BUMPER),
+            Button::DPadUp => Ok(Self::DPAD_UP),
+            Button::DPadDown => Ok(Self::DPAD_DOWN),
+            Button::DPadLeft => Ok(Self::DPAD_LEFT),
+            Button::DPadRight => Ok(Self::DPAD_RIGHT),
+            button => Err(Self::Error::Unsupported(button)),
         }
     }
 }

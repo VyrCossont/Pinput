@@ -1,12 +1,10 @@
 [package]
 name = "pinput"
 version = "0.1.2"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
-sdl2 = { version = "0.34.5", features = ["bundled", "static-link"] }
+sdl2 = { version = "0.35.1", features = ["bundled", "static-link"] }
 sysinfo = "0.20.5"
 proc-maps = "0.1.9"
 process-memory = "0.4.0"
