@@ -4,7 +4,7 @@ version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-sdl2 = { version = "0.35.1", features = ["bundled", "static-link"] }
+sdl2 = { version = "0.35.1", features = ["bundled", "static-link", "hidapi"] }
 sysinfo = "0.20.5"
 proc-maps = "0.1.9"
 process-memory = "0.4.0"

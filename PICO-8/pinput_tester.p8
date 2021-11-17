@@ -207,8 +207,8 @@ function _update60()
  local rt = pi_trigger(pi_rt, 0)
  
  if pi_is_inited() and trigger_rumble then
-  --pi_rumble(pi_lo, lt, 0)
-  --pi_rumble(pi_hi, rt, 0)
+  pi_rumble(pi_lo, lt, 0)
+  pi_rumble(pi_hi, rt, 0)
  end
  
  lt_dx = lt / (0xff / trigger_width)

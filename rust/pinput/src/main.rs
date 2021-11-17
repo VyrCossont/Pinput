@@ -65,6 +65,8 @@ struct SdlGamepad {
     joystick: Joystick,
     /// Used for everything else.
     game_controller: GameController,
+    /// Can this gamepad rumble? We can only test by trying it.
+    rumble_capable: bool,
 }
 
 fn main() -> Result<(), Error> {
@@ -130,6 +132,7 @@ fn main() -> Result<(), Error> {
                 sdl_gamepads[gamepad_index] = Some(SdlGamepad {
                     joystick: joystick_subsystem.open(sdl_gamepad_index)?,
                     game_controller: game_controller_subsystem.open(sdl_gamepad_index)?,
+                    rumble_capable: true, // Assume capable until we try at least once.
                 });
             }
 
@@ -154,12 +157,19 @@ fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -> Re
         return Ok(())
     }
 
-    // TODO: test rumble. Some devices (Xbone on Windows?) claim not to support it.
-    game_controller.set_rumble(
-        ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
-        ((gamepad.hi_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
-        FRAME_DURATION_MS as u32
-    )?;
+    // Set rumble effects, if we can.
+    // Some devices (Xbox model 1708 on macOS over Bluetooth is one) don't support rumble;
+    // others need hints like `SDL_JOYSTICK_HIDAPI_PS4_RUMBLE` to be set, plus testing.
+    if sdl_gamepad.rumble_capable {
+        game_controller.set_rumble(
+            ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
+            ((gamepad.hi_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
+            FRAME_DURATION_MS as u32
+        ).err().into_iter().for_each(|err| {
+            sdl_gamepad.rumble_capable = false;
+            println!("{} doesn't support rumble: {}", game_controller.name(), err);
+        });
+    }
 
     // Read gamepad capabilities and power level.
     gamepad.flags = PinputGamepadFlags::default();
