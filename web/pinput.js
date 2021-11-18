@@ -3,7 +3,7 @@
  * Include this module in your exported HTML and call `Pinput.init()`,
  * and it should work the same way as the desktop versions.
  *
- * by @vyr@demon.social
+ * v0.1.1 by @vyr@demon.social
  */
 
 const magic = [
@@ -31,6 +31,7 @@ const gamepadStride = 16;
 
 const connected = 1 << 0;
 const hasGuideButton = 1 << 3;
+const hasMiscButton = 1 << 4;
 
 // Gamepad battery status not supported.
 
@@ -48,7 +49,7 @@ const buttonsHiOffset = 3;
 const leftBumper = 1 << 0;
 const rightBumper = 1 << 1;
 const guide = 1 << 2;
-const reserved = 1 << 3;
+const misc = 1 << 3;
 const a = 1 << 4;
 const b = 1 << 5;
 const x = 1 << 6;
@@ -108,6 +109,9 @@ function loop() {
         if (gamepad.buttons.length > 16) {
             flags |= hasGuideButton;
         }
+        if (gamepad.buttons.length > 17) {
+            flags |= hasMiscButton;
+        }
         pico8_gpio[gamepadBase] = flags;
 
         // Handle low byte of buttons.
@@ -160,6 +164,9 @@ function loop() {
         }
         if (gamepad.buttons.length > 16 && gamepad.buttons[16].pressed) {
             buttonsHi |= guide;
+        }
+        if (gamepad.buttons.length > 17 && gamepad.buttons[17].pressed) {
+            buttonsHi |= misc;
         }
         pico8_gpio[gamepadBase + buttonsHiOffset] = buttonsHi;
 
