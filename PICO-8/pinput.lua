@@ -51,8 +51,7 @@ pi_lb = 8
 pi_rb = 9
 
 pi_guide = 10
-
-pi_reserved = 11
+pi_misc = 11
 
 pi_a = 12
 pi_🅾️ = pi_a
@@ -72,7 +71,7 @@ function pi_btn(b, pl)
  local buttons = %(pi_gpio
   + pl * pi_gamepad_stride
   + pi_buttons_offset)
- return 1 & (buttons >> b)  
+ return 1 & (buttons >> b) == 1
 end
 
 -- triggers
@@ -154,6 +153,44 @@ end
 
 -- todo:
 
--- gamepad capabilities
--- gamepad count
--- battery/charging status
+-- buttons
+
+pi_flags_offset = 0
+pi_num_flags = 5
+
+pi_connected = 0
+pi_has_battery = 1
+pi_charging = 2
+pi_has_guide_button = 3
+pi_has_misc_button = 4
+
+-- read a flag
+function pi_flag(f, pl)
+ pl = pl or 0
+ if pl < 0 or pl >= pi_num_players
+ or f < 0 or f >= pi_num_flags then
+  assert(false, 'pi_flag: parameter out of range')
+ end
+
+ local buttons = @(pi_gpio
+  + pl * pi_gamepad_stride
+  + pi_flags_offset)
+ return 1 & (buttons >> f) == 1
+end
+
+-- battery level
+
+pi_battery_offset = 1
+
+-- read battery level
+-- (0 for wired)
+function pi_battery(pl)
+ pl = pl or 0
+ if pl < 0 or pl >= pi_num_players then
+  assert(false, 'pi_battery: parameter out of range')
+ end
+
+ return @(pi_gpio
+  + pl * pi_gamepad_stride
+  + pi_battery_offset)
+end

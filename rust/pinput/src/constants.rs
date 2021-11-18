@@ -6,5 +6,8 @@ pub const PINPUT_MAGIC: Uuid = Uuid::from_u128(0x0220c74677ab446ebedc7fd6d277984
 /// Pinput can fit this many gamepads into the GPIO area.
 pub const PINPUT_MAX_GAMEPADS: usize = 8;
 
-/// 60 FPS.
-pub static FRAME_DURATION_MS: u16 = 16;
+/// 60 Hz.
+pub static FRAME_DURATION_MS: i64 = 16;
+
+/// 1 Hz between attempts to connect to PICO-8.
+pub static SCAN_INTERVAL_MS: i64 = 1000;

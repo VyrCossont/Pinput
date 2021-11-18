@@ -35,7 +35,7 @@ rt_dx = 0
 clr_border = 5
 clr_fill = 7
 
-clrs_button = {clr_border, clr_fill}
+clrs_button = {[false]=clr_border, [true]=clr_fill}
 
 ⬆️_x = 32 - 4
 ⬆️_y = 80 - 8
@@ -86,6 +86,11 @@ back_x = guide_x - 8
 start_x = guide_x + 8
 meta_y = 32
 
+battery_y = 96
+battery_x = 64
+charging_x = battery_x - 6
+battery_level_x = battery_x + 6
+
 function _draw()
  cls()
  
@@ -97,57 +102,64 @@ function _draw()
  -- buttons
  
  print("⬆️", ⬆️_x, ⬆️_y,
-  clrs_button[1 + pi_btn(pi_⬆️, 0)])
+  clrs_button[pi_btn(pi_⬆️, 0)])
  
  print("⬇️", ⬇️_x, ⬇️_y,
-  clrs_button[1 + pi_btn(pi_⬇️, 0)])
+  clrs_button[pi_btn(pi_⬇️, 0)])
  
  print("⬅️", ⬅️_x, ⬅️_y,
-  clrs_button[1 + pi_btn(pi_⬅️, 0)])
+  clrs_button[pi_btn(pi_⬅️, 0)])
  
  print("➡️", ➡️_x, ➡️_y,
-  clrs_button[1 + pi_btn(pi_➡️, 0)])
+  clrs_button[pi_btn(pi_➡️, 0)])
 	
  circ(a_x + 1, a_y + 2, btn_r, clr_border)
  print("a", a_x, a_y,
-  clrs_button[1 + pi_btn(pi_a, 0)])
+  clrs_button[pi_btn(pi_a, 0)])
  
  circ(b_x + 1, b_y + 2, btn_r, clr_border)
  print("b", b_x, b_y,
-  clrs_button[1 + pi_btn(pi_b, 0)])
+  clrs_button[pi_btn(pi_b, 0)])
 
  circ(x_x + 1, x_y + 2, btn_r, clr_border)
  print("x", x_x, x_y,
-  clrs_button[1 + pi_btn(pi_x, 0)])
+  clrs_button[pi_btn(pi_x, 0)])
  
  circ(y_x + 1, y_y + 2, btn_r, clr_border)
  print("y", y_x, y_y,
-  clrs_button[1 + pi_btn(pi_y, 0)])
+  clrs_button[pi_btn(pi_y, 0)])
 
  circ(ls_x, ls_y, btn_r * 1.5, clr_border)
  print("ls", ls_x - 3, ls_y - 2,
-  clrs_button[1 + pi_btn(pi_ls, 0)])
+  clrs_button[pi_btn(pi_ls, 0)])
 
  circ(rs_x, rs_y, btn_r * 1.5, clr_border)
  print("rs", rs_x - 3, rs_y - 2,
-  clrs_button[1 + pi_btn(pi_rs, 0)])
+  clrs_button[pi_btn(pi_rs, 0)])
 
  circ(lb_x, lb_y, btn_r * 1.5, clr_border)
  print("lb", lb_x - 3, lb_y - 2,
-  clrs_button[1 + pi_btn(pi_lb, 0)])
+  clrs_button[pi_btn(pi_lb, 0)])
 
  circ(rb_x, rb_y, btn_r * 1.5, clr_border)
  print("rb", rb_x - 3, rb_y - 2,
-  clrs_button[1 + pi_btn(pi_rb, 0)])
+  clrs_button[pi_btn(pi_rb, 0)])
   
  print("⬅️", back_x - 2, meta_y,
-  clrs_button[1 + pi_btn(pi_back, 0)])
- 
- print("⌂", guide_x - 2, meta_y,
-  clrs_button[1 + pi_btn(pi_guide, 0)])
+  clrs_button[pi_btn(pi_back, 0)])
+
+ if pi_flag(pi_has_guide_button, 0) then
+  print("⌂", guide_x - 2, meta_y,
+   clrs_button[pi_btn(pi_guide, 0)])
+ end
+
+ if pi_flag(pi_has_misc_button, 0) then
+  print("★", guide_x - 2, meta_y + 6,
+   clrs_button[pi_btn(pi_misc, 0)])
+ end
  
  print("➡️", start_x - 2, meta_y,
-  clrs_button[1 + pi_btn(pi_start, 0)])
+  clrs_button[pi_btn(pi_start, 0)])
 	
  -- sticks
 
@@ -200,6 +212,18 @@ function _draw()
   rt_x + trigger_width,
   trigger_y + trigger_height,
   clr_border)
+
+ -- battery
+
+ if pi_flag(pi_has_battery, 0) then
+  if pi_flag(pi_charging, 0) then
+   print("∧", charging_x, battery_y, clr_fill)
+  end
+  print("█", battery_x, battery_y, clr_fill)
+  print(
+   tostr(flr(pi_battery(0) / 0xff * 100)) .. "%",
+   battery_level_x, battery_y, clr_fill)
+ end
 end
 
 function _update60()
