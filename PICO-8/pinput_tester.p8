@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 33
 __lua__
--- pinput gamepad tester v0.1.1
+-- pinput gamepad tester v0.1.2
 -- @vyr@demon.social
 
 function _init()
