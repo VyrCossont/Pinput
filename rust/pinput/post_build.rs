@@ -29,19 +29,27 @@ trait ExitOkExt {
 }
 
 impl ExitOkExt for ExitStatus {
+    #[cfg(not(unix))]
     fn exit_ok(&self) -> Result<()> {
         if self.success() {
             Ok(())
         } else if let Some(code) = self.code() {
             Err(anyhow!("Exited with status code: {}", code))
-        } else if cfg!(unix) {
-            if let Some(signal) = self.signal() {
-                Err(anyhow!("Process terminated by signal: {}", signal))
-            } else {
-                Err(anyhow!("Process terminated under mysterious circumstances"))
-            }
         } else {
             Err(anyhow!("Process terminated by signal"))
+        }
+    }
+
+    #[cfg(unix)]
+    fn exit_ok(&self) -> Result<()> {
+        if self.success() {
+            Ok(())
+        } else if let Some(code) = self.code() {
+            Err(anyhow!("Exited with status code: {}", code))
+        } else if let Some(signal) = self.signal() {
+            Err(anyhow!("Process terminated by signal: {}", signal))
+        } else {
+            Err(anyhow!("Process terminated under mysterious circumstances"))
         }
     }
 }
