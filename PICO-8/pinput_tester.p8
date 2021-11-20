@@ -87,9 +87,7 @@ start_x = guide_x + 8
 meta_y = 32
 
 battery_y = 96
-battery_x = 64
-charging_x = battery_x - 6
-battery_level_x = battery_x + 6
+battery_x = 64 - 4
 
 function _draw()
  cls()
@@ -216,13 +214,13 @@ function _draw()
  -- battery
 
  if pi_flag(pi_has_battery, 0) then
+  print("+-\n█", battery_x, battery_y, clr_border)
   if pi_flag(pi_charging, 0) then
-   print("∧", charging_x, battery_y, clr_fill)
+   print("\n∧", battery_x, battery_y, clr_fill)
   end
-  print("█", battery_x, battery_y, clr_fill)
   print(
-   tostr(flr(pi_battery(0) / 0xff * 100)) .. "%",
-   battery_level_x, battery_y, clr_fill)
+   tostr("\n\n" .. flr(pi_battery(0) / 0xff * 100)) .. "%",
+   battery_x, battery_y, clr_fill)
  end
 end
 
