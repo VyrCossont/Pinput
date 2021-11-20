@@ -20,6 +20,12 @@ struct PinputGamepadFlags: OptionSet {
     /// (XInput on Windows, for example).
     static let hasGuideButton: Self = .init(rawValue: 1 << 3)
 
+    /// Does this controller have a misc or touchpad-click button?
+    static let hasMiscButton: Self = .init(rawValue: 1 << 4)
+
+    /// Does this controller support vibration?
+    static let hasVibration: Self = .init(rawValue: 1 << 5)
+
     /// Update the battery charging status.
     mutating func update(from gcDeviceBattery: GCDeviceBattery) {
         if gcDeviceBattery.batteryState == .charging {
@@ -45,6 +51,26 @@ extension PinputGamepadFlags {
         if gcExtendedGamepad.buttonHome != nil {
             insert(.hasGuideButton)
         }
+
+        if gcExtendedGamepad is GCDualShockGamepad {
+            insert(.hasMiscButton)
+        }
+
+        // TODO: target newer SDK for these
+
+//        if #available(macOS 11.3, *) {
+//            if gcExtendedGamepad is GCDualShockGamepad {
+//                insert(.hasMiscButton)
+//            }
+//        }
+
+//        if let gcXboxGamepad = gcExtendedGamepad as? GCXboxGamepad {
+//            if #available(macOS 15.0, *) {
+//                if gcXboxGamepad.buttonShare != nil {
+//                    insert(.hasMiscButton)
+//                }
+//            }
+//        }
     }
 }
 
@@ -70,8 +96,8 @@ struct PinputGamepadButtons: OptionSet {
 
     static let guide: Self = .init(rawValue: 1 << 10)
 
-    /// Does not correspond to any actual button.
-    static let reserved: Self = .init(rawValue: 1 << 11)
+    /// Corresponds to a DS4 or DualSense touchpad click or an Xbox X|S Share button.
+    static let misc: Self = .init(rawValue: 1 << 11)
 
     static let a: Self = .init(rawValue: 1 << 12)
     static let b: Self = .init(rawValue: 1 << 13)
@@ -118,6 +144,17 @@ struct PinputGamepadButtons: OptionSet {
 
         case gcExtendedGamepad.buttonHome:
             button = .guide
+
+        case (gcExtendedGamepad as? GCDualShockGamepad)?.touchpadButton:
+            button = .misc
+
+        // TODO: target newer SDK for these
+
+//        case (gcExtendedGamepad as? GCDualSenseGamepad)?.touchpadButton:
+//            button = .misc
+
+//        case (gcExtendedGamepad as? GCXboxGamepad)?.buttonShare:
+//            button = .misc
 
         default:
             logger.log("Gamepad \(gcExtendedGamepad, privacy: .public) updated unknown button: \(gcControllerButtonInput, privacy: .public)")
@@ -187,6 +224,30 @@ extension PinputGamepadButtons {
         if gcExtendedGamepad.buttonHome?.isPressed ?? false {
             self.insert(.guide)
         }
+
+        if let gcDualShockGamepad = gcExtendedGamepad as? GCDualShockGamepad {
+            if gcDualShockGamepad.touchpadButton.isPressed {
+                self.insert(.misc)
+            }
+        }
+
+        // TODO: target newer SDK for these
+
+//        if #available(macOS 11.3, *) {
+//            if let gcDualSenseGamepad = gcExtendedGamepad as? GCDualSenseGamepad {
+//                if gcDualSenseGamepad.touchpadButton.isPressed {
+//                    self.insert(.misc)
+//                }
+//            }
+//        }
+
+//        if let gcXboxGamepad = gcExtendedGamepad as? GCXboxGamepad {
+//            if #available(macOS 15.0, *) {
+//                if gcXboxGamepad.buttonShare?.isPressed ?? false {
+//                    self.insert(.misc)
+//                }
+//            }
+//        }
     }
 }
 
@@ -288,6 +349,9 @@ struct PinputGamepad {
 
         case gcExtendedGamepad.buttonHome:
             buttons.update(from: gcExtendedGamepad, gcExtendedGamepad.buttonHome!)
+
+        case (gcExtendedGamepad as? GCDualShockGamepad)?.touchpadButton:
+            buttons.update(from: gcExtendedGamepad, (gcExtendedGamepad as! GCDualShockGamepad).touchpadButton)
 
         case gcExtendedGamepad.leftTrigger:
             leftTrigger = UInt8(gcExtendedGamepad.leftTrigger.value * Float(UInt8.max))
