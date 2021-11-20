@@ -91,10 +91,21 @@ let (timer_tx, timer_rx) = channel();
                 if !game_controller_subsystem.is_game_controller(sdl_gamepad_index) {
                     continue;
                 }
+                let mut game_controller = game_controller_subsystem.open(sdl_gamepad_index)?;
+
+                // There's no way to test for rumble support other than by trying it.
+                // TODO: this will be fixed in SDL 2.0.18, with `SDL_GameControllerHasRumble`.
+                let has_rumble = game_controller.set_rumble(0, 0, 0).is_ok();
+                println!(
+                    "{} {} rumble.",
+                    game_controller.name(),
+                    if has_rumble { "supports" } else { "doesn't support" }
+                );
+
                 sdl_gamepads[gamepad_index] = Some(SdlGamepad {
                     joystick: joystick_subsystem.open(sdl_gamepad_index)?,
-                    game_controller: game_controller_subsystem.open(sdl_gamepad_index)?,
-                    rumble_capable: true, // Assume capable until we try at least once.
+                    game_controller,
+                    has_rumble,
                 });
             }
 
@@ -120,6 +131,11 @@ fn main() -> Result<(), Error> {
     let keep_going = Arc::new(AtomicBool::new(true));
     let keep_going_ctrlc = keep_going.clone();
     ctrlc::set_handler(move || keep_going_ctrlc.store(false, Ordering::Relaxed))?;
+
+    // Using the Windows raw input joystick driver breaks XInput devices on Windows.
+    // https://github.com/MysteriousJ/Joystick-Input-Examples#rawinput suggests that raw input
+    // needs a window to function, which we don't currently create.
+    sdl2::hint::set("SDL_JOYSTICK_RAWINPUT", "0");
 
     let sdl_context = sdl2::init()
         .map_err(|s| Error::SdlStringError(s))?;

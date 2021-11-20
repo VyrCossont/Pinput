@@ -27,6 +27,9 @@ bitflags! {
 
         /// Does this controller have a misc or touchpad-click button?
         const HAS_MISC_BUTTON = 1 << 4;
+
+        /// Does this controller support vibration?
+        const HAS_RUMBLE = 1 << 5;
     }
 }
 
@@ -165,7 +168,7 @@ pub struct SdlGamepad {
     /// Used for everything else.
     pub game_controller: GameController,
     /// Can this gamepad rumble? We can only test by trying it.
-    pub rumble_capable: bool,
+    pub has_rumble: bool,
 }
 
 pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -> Result<(), Error> {
@@ -178,17 +181,13 @@ pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -
     }
 
     // Set rumble effects, if we can.
-    // Some devices (Xbox model 1708 on macOS over Bluetooth is one) don't support rumble;
-    // others need hints like `SDL_JOYSTICK_HIDAPI_PS4_RUMBLE` to be set, plus testing.
-    if sdl_gamepad.rumble_capable {
+    if sdl_gamepad.has_rumble {
         game_controller.set_rumble(
             ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
             ((gamepad.hi_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
-            FRAME_DURATION_MS as u32
-        ).err().into_iter().for_each(|err| {
-            sdl_gamepad.rumble_capable = false;
-            println!("{} doesn't support rumble: {}", game_controller.name(), err);
-        });
+            // Setting one frame of rumble leads to choppiness as the effect may expire early.
+            2 * FRAME_DURATION_MS as u32
+        )?;
     }
 
     // Read gamepad capabilities and power level.
@@ -200,6 +199,9 @@ pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -
     }
     if mapping.contains("misc1:") || mapping.contains("touchpad:") {
         gamepad.flags.insert(PinputGamepadFlags::HAS_MISC_BUTTON);
+    }
+    if sdl_gamepad.has_rumble {
+        gamepad.flags.insert(PinputGamepadFlags::HAS_RUMBLE);
     }
     // SDL doesn't currently have a way to tell if a gamepad is charging.
     let power_level = joystick.power_level()?;
