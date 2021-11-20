@@ -71,6 +71,10 @@ extension PinputGamepadFlags {
 //                }
 //            }
 //        }
+
+        if gcExtendedGamepad.controller?.haptics?.supportedLocalities.count ?? 0 > 0 {
+            insert(.hasVibration)
+        }
     }
 }
 
