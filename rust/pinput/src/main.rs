@@ -95,7 +95,7 @@ let (timer_tx, timer_rx) = channel();
 
                 // There's no way to test for rumble support other than by trying it.
                 // TODO: this will be fixed in SDL 2.0.18, with `SDL_GameControllerHasRumble`.
-                let has_rumble = game_controller.set_rumble(0, 0, 0).is_ok();
+                let has_rumble = game_controller.set_rumble(1, 1, 0).is_ok();
                 println!(
                     "{} {} rumble.",
                     game_controller.name(),
