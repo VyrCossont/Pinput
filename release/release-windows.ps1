@@ -23,6 +23,8 @@ foreach ($platform in "x64", "x86")
     } else {
         $exePath = "$pinputCliDir\$platform\Release\PinputCli.exe"
     }
+    # TODO: check executable with `dumpbin.exe /pdbpath`:
+    #   https://docs.microsoft.com/en-us/cpp/build/reference/pdbpath
     $zipPath = "$releaseDir\artifacts\pinput-windows-$platform-$version.zip"
     Compress-Archive -Force -Path $exePath -DestinationPath $zipPath
 }
