@@ -3,7 +3,7 @@
 set -eu
 
 # https://stackoverflow.com/a/29835459
-release_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+release_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 macos_dir="${release_dir}/../macOS"
 archive_path="${macos_dir}/Pinput.xcarchive"
