@@ -222,6 +222,15 @@ function _draw()
    tostr("\n\n" .. flr(pi_battery(0) / 0xff * 100)) .. "%",
    battery_x, battery_y, clr_fill)
  end
+
+ -- flags
+
+ if pi_flag(pi_has_rumble, 0) then
+  local rumbling = lt_dx > 0 or rt_dx > 0
+  print('  \72\65\83\n\32\82\85\77\66\76\69',
+   guide_x - 15, trigger_y,
+   clrs_button[rumbling])
+  end
 end
 
 function _update60()

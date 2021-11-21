@@ -12,6 +12,7 @@ version=$(cat release/version.txt)
 
 # Build and archive.
 # https://developer.apple.com/library/archive/technotes/tn2339/_index.html#//apple_ref/doc/uid/DTS40014588-CH1-HOW_DO_I_BUILD_MY_PROJECTS_FROM_THE_COMMAND_LINE_
+rm -rf "${archive_path}"
 xcodebuild \
   -project "${macos_dir}/Pinput.xcodeproj" \
   -scheme Pinput \
@@ -21,6 +22,7 @@ xcodebuild \
 
 # Export the archive.
 # https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/customizing_the_notarization_workflow/customizing_the_xcode_archive_process
+rm -rf "${app_path}"
 xcodebuild \
   -exportArchive \
   -archivePath "${archive_path}" \

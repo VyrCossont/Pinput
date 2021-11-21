@@ -32,6 +32,7 @@ const gamepadStride = 16;
 const connected = 1 << 0;
 const hasGuideButton = 1 << 3;
 const hasMiscButton = 1 << 4;
+const hasRumble = 1 << 5;
 
 // Gamepad battery status not supported.
 
@@ -73,10 +74,13 @@ axisMappings.set(1, [leftStickYOffset, -1]);
 axisMappings.set(2, [rightStickXOffset, 1]);
 axisMappings.set(3, [rightStickYOffset, -1]);
 
-// TODO: rumble using Web Vibration API or GamepadHapticActuator (preferred)
 const rumbleMax = 0xff;
 const loFreqRumbleOffset = 14;
 const hiFreqRumbleOffset = 15;
+const rumbleDurationMs = 33; // 2 PICO-8 frames.
+const rumbleMappings = new Map();
+rumbleMappings.set(0, [loFreqRumbleOffset, 'weakMagnitude']);
+rumbleMappings.set(1, [hiFreqRumbleOffset, 'strongMagnitude']);
 
 /** Called every animation frame to push gamepad inputs into PICO-8's GPIO area. */ 
 function loop() {
@@ -103,6 +107,21 @@ function loop() {
             continue;
         }
 
+        // Detect Firefox vibration support.
+        // https://developer.mozilla.org/en-US/docs/Web/API/Gamepad/hapticActuators
+        const hasSupportedGamepadHapticActuators =
+            gamepad.hapticActuators !== undefined
+            && gamepad.hapticActuators.length >= 2
+            && gamepad.hapticActuators
+                .every(actuator => actuator.type === 'vibration');
+
+        // Detect Chrome vibration support.
+        // https://web.dev/gamepad/#making-use-of-the-vibration-actuator
+        // https://docs.google.com/document/d/1jPKzVRNzzU4dUsvLpSXm1VXPQZ8FP-0lKMT-R_p-s6g/edit
+        const hasSupportedVibrationActuator =
+            gamepad.vibrationActuator !== undefined
+            && gamepad.vibrationActuator.type === 'dual-rumble';
+
         // Some gamepads use the standard mapping but have a `buttons` array too short to have the guide button.
         // The Logitech F310 in DirectInput mode is an example.
         let flags = connected;
@@ -111,6 +130,9 @@ function loop() {
         }
         if (gamepad.buttons.length > 17) {
             flags |= hasMiscButton;
+        }
+        if (hasSupportedGamepadHapticActuators || hasSupportedVibrationActuator) {
+            flags |= hasRumble;
         }
         pico8_gpio[gamepadBase] = flags;
 
@@ -184,6 +206,23 @@ function loop() {
             pico8_gpio[gamepadBase + axisOffset] = axisLo;
             const axisHi = (axisValue >>> 8) & 0xff;
             pico8_gpio[gamepadBase + axisOffset + 1] = axisHi;
+        }
+
+        // Rumble, if this browser and gamepad support it.
+        if (hasSupportedGamepadHapticActuators) {
+            for (const [rumbleIndex, [rumbleOffset, _]] of rumbleMappings) {
+                const rumble = pico8_gpio[gamepadBase + rumbleOffset] / rumbleMax;
+                const _ = gamepad.hapticActuators[rumbleIndex].pulse(rumble, rumbleDurationMs);
+            }
+        } else if (hasSupportedVibrationActuator) {
+            const effect = {
+                startDelay: 0,
+                duration: rumbleDurationMs,
+            }
+            for (const [_, [rumbleOffset, rumbleKey]] of rumbleMappings) {
+                effect[rumbleKey] = pico8_gpio[gamepadBase + rumbleOffset] / rumbleMax;
+            }
+            gamepad.vibrationActuator.playEffect('dual-rumble', effect);
         }
     }
 

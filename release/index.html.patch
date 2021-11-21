@@ -1,8 +1,9 @@
---- inded.html
+--- index.html
 +++ index.html
 @@ -1,6 +1,11 @@
  ﻿<html><head>
- <title>PICO-8 Cartridge</title>
+-<title>PICO-8 Cartridge</title>
++<title>Pinput (web edition)</title>
  <meta name="viewport" content="width=device-width, user-scalable=no">
 +<script type='module' src='./pinput.js'></script>
 +<script type='module'>
