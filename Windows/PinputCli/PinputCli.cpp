@@ -3,6 +3,7 @@
 #endif
 
 #include <algorithm>
+#include <bitset>
 #include <iomanip>
 #include <iostream>
 #include <vector>
@@ -39,14 +40,63 @@ constexpr const uint8_t pinputMagic[] = {
 
 constexpr size_t pico8GpioOffsetFromCartridgeRamBase = 0x5f80;
 constexpr size_t pico8GpioSize = 0x80;
-constexpr size_t pico8RegularMemorySize = 0x8000;
-constexpr size_t pico8ExtendedMemorySize = 0x10000;
+
+/// The state of the Guide button is undocumented, but SDL reads it somehow.
+#define XINPUT_GAMEPAD_GUIDE 0x0400
+/// I don't know if the Xbox Series X|S Share button is in there, but there's only one value left.
+#define XINPUT_GAMEPAD_SHARE 0x0800
+
+#ifdef _DEBUG
+
+constexpr WORD debugButtonMasks[] = {
+    XINPUT_GAMEPAD_DPAD_UP,
+    XINPUT_GAMEPAD_DPAD_DOWN,
+    XINPUT_GAMEPAD_DPAD_LEFT,
+    XINPUT_GAMEPAD_DPAD_RIGHT,
+    XINPUT_GAMEPAD_START,
+    XINPUT_GAMEPAD_BACK,
+    XINPUT_GAMEPAD_LEFT_THUMB,
+    XINPUT_GAMEPAD_RIGHT_THUMB,
+    XINPUT_GAMEPAD_LEFT_SHOULDER,
+    XINPUT_GAMEPAD_RIGHT_SHOULDER,
+    XINPUT_GAMEPAD_GUIDE,
+    XINPUT_GAMEPAD_SHARE,
+    XINPUT_GAMEPAD_A,
+    XINPUT_GAMEPAD_B,
+    XINPUT_GAMEPAD_X,
+    XINPUT_GAMEPAD_Y,
+};
+
+constexpr const wchar_t* debugButtonNames[] = {
+    L"XINPUT_GAMEPAD_DPAD_UP",
+    L"XINPUT_GAMEPAD_DPAD_DOWN",
+    L"XINPUT_GAMEPAD_DPAD_LEFT",
+    L"XINPUT_GAMEPAD_DPAD_RIGHT",
+    L"XINPUT_GAMEPAD_START",
+    L"XINPUT_GAMEPAD_BACK",
+    L"XINPUT_GAMEPAD_LEFT_THUMB",
+    L"XINPUT_GAMEPAD_RIGHT_THUMB",
+    L"XINPUT_GAMEPAD_LEFT_SHOULDER",
+    L"XINPUT_GAMEPAD_RIGHT_SHOULDER",
+    L"XINPUT_GAMEPAD_GUIDE",
+    L"XINPUT_GAMEPAD_SHARE",
+    L"XINPUT_GAMEPAD_A",
+    L"XINPUT_GAMEPAD_B",
+    L"XINPUT_GAMEPAD_X",
+    L"XINPUT_GAMEPAD_Y",
+};
+
+template <typename T>
+std::bitset<CHAR_BIT * sizeof T> bits(T t) {
+    return std::bitset<CHAR_BIT * sizeof T>(t);
+}
+
+#endif
 
 /// <summary>
-/// Print the last error from a Windows API function to stderr.
+/// Print an error from a Windows API function to stderr.
 /// </summary>
-void printLastError() {
-    DWORD error = GetLastError();
+void printError(DWORD error) {
     LPWSTR errorMessage = nullptr;
     DWORD errorMessageSize = FormatMessage(
         FORMAT_MESSAGE_ALLOCATE_BUFFER
@@ -65,6 +115,14 @@ void printLastError() {
     else {
         std::wcerr << "FormatMessage failed to format error " << error << " with error " << GetLastError() << std::endl;
     }
+}
+
+/// <summary>
+/// Print the last error from a Windows API function to stderr.
+/// </summary>
+void printLastError() {
+    DWORD error = GetLastError();
+    printError(error);
 }
 
 /// <summary>
@@ -239,9 +297,11 @@ uint8_t* findPico8CartridgeRamBase(HANDLE pico8Process) {
         printLastError();
         return nullptr;
     }
+#ifdef _DEBUG
     std::wcout << "    lpBaseOfDll = " << moduleInfo.lpBaseOfDll << std::endl;
     std::wcout << "    SizeOfImage = " << moduleInfo.SizeOfImage << std::endl;
     std::wcout << "    EntryPoint = " << moduleInfo.EntryPoint << std::endl;
+#endif
 
     // Read entire module into our process memory.
     uint8_t* entireModuleBytes = new uint8_t[moduleInfo.SizeOfImage];
@@ -322,6 +382,8 @@ enum PinputGamepadFlags : uint8_t {
     hasBattery = 1 << 1,
     charging = 1 << 2,
     hasGuideButton = 1 << 3,
+    hasMiscButton = 1 << 4,
+    hasRumble = 1 << 5,
 };
 
 typedef struct _PinputGamepad {
@@ -346,6 +408,7 @@ constexpr int recheckFrameInterval = 5;
 /// address space corresponding to base of GPIO area.</param>
 void pollXInput(HANDLE pico8Process, uint8_t* pico8GpioBase) {
     BOOL ok;
+    DWORD result;
     
     uint8_t pico8GpioBuffer[pico8GpioSize] = {};
 
@@ -381,6 +444,9 @@ void pollXInput(HANDLE pico8Process, uint8_t* pico8GpioBase) {
         return;
     }
 
+#ifdef _DEBUG
+    bool debugPrintCapabilities[4] = { true, true, true, true };
+#endif
     for (;;) {
         // If this read fails, the PICO-8 process probably quit.
         SIZE_T numBytesRead;
@@ -410,18 +476,32 @@ void pollXInput(HANDLE pico8Process, uint8_t* pico8GpioBase) {
                 connected[player] = false;
                 lastPacketNumber[player] = 0;
             }
-            // TODO: switch off currently playing rumble
         }
 
         bool recheck = frame == 0;
         for (int player = 0; player < XUSER_MAX_COUNT; player++) {
             if (connected[player] || recheck) {
                 XINPUT_STATE state = {};
-                DWORD result = XInputGetState(player, &state);
-
+                result = XInputGetState(player, &state);
+                if (result != ERROR_SUCCESS && result != ERROR_DEVICE_NOT_CONNECTED) {
+                    std::wcerr << "Couldn't get capabilities for player "
+                        << player + 1 << ": ";
+                    printError(result);
+                }
                 connected[player] = result == ERROR_SUCCESS;
 
-                // TODO: handle rumble based on what we read from GPIO
+                // Set rumble. This is outgoing data, so we do it before we check the packet number.
+                if (connected[player]) {
+                    XINPUT_VIBRATION vibration = {};
+                    vibration.wLeftMotorSpeed = pinputGamepads[player].loFreqRumble * 0x101;
+                    vibration.wRightMotorSpeed = pinputGamepads[player].hiFreqRumble * 0x101;
+                    result = XInputSetState(player, &vibration);
+                    if (result != ERROR_SUCCESS && result != ERROR_DEVICE_NOT_CONNECTED) {
+                        std::wcerr << "Couldn't set vibration state for player "
+                            << player + 1 << ": ";
+                        printError(result);
+                    }
+                }
 
                 if (!connected[player] || lastPacketNumber[player] == state.dwPacketNumber) {
                     continue;
@@ -431,28 +511,76 @@ void pollXInput(HANDLE pico8Process, uint8_t* pico8GpioBase) {
 
                 pinputGamepads[player].gamepad = state.Gamepad;
 
-                if (recheck) {
+                if (connected[player] && recheck) {
+                    pinputGamepads[player].flags = PinputGamepadFlags::connected;
+
+                    XINPUT_CAPABILITIES capabilities;
+                    result = XInputGetCapabilities(player, 0, &capabilities);
+                    if (result != ERROR_SUCCESS) {
+#ifdef _DEBUG
+                        debugPrintCapabilities[player] = false;
+#endif
+                        std::wcerr << "Couldn't get capabilities for player "
+                            << player + 1 << ": ";
+                        printError(result);
+                    }
+#ifdef _DEBUG
+                    else if (debugPrintCapabilities[player]) {
+                        debugPrintCapabilities[player] = false;
+                        
+                        std::wcerr << "Player " << player + 1 << " capabilities:" << std::endl;
+
+                        std::wcerr << "    wButtons: " << bits(capabilities.Gamepad.wButtons) << std::endl;
+                        for (int b = 0; b < 16; b++) {
+                            if ((capabilities.Gamepad.wButtons & debugButtonMasks[b]) == debugButtonMasks[b]) {
+                                std::wcerr << "    - " << debugButtonNames[b] << std::endl;
+                            }
+                        }
+
+                        std::wcerr << "    wLeftMotorSpeed: " << bits(capabilities.Vibration.wLeftMotorSpeed) << std::endl;
+                        std::wcerr << "    wRightMotorSpeed: " << bits(capabilities.Vibration.wRightMotorSpeed) << std::endl;
+
+                        std::wcerr << std::endl;
+                    }
+#endif
+                    else {
+                        if ((capabilities.Gamepad.wButtons & XINPUT_GAMEPAD_GUIDE) == XINPUT_GAMEPAD_GUIDE) {
+                            pinputGamepads[player].flags |= PinputGamepadFlags::hasGuideButton;
+                        }
+                        if ((capabilities.Gamepad.wButtons & XINPUT_GAMEPAD_SHARE) == XINPUT_GAMEPAD_SHARE) {
+                            pinputGamepads[player].flags |= PinputGamepadFlags::hasMiscButton;
+                        }
+                        if (capabilities.Vibration.wLeftMotorSpeed != 0 || capabilities.Vibration.wRightMotorSpeed != 0) {
+                            pinputGamepads[player].flags |= PinputGamepadFlags::hasRumble;
+                        }
+                    }
+
                     XINPUT_BATTERY_INFORMATION batteryInfo = {};
                     result = XInputGetBatteryInformation(player, BATTERY_DEVTYPE_GAMEPAD, &batteryInfo);
-
-                    pinputGamepads[player].flags = PinputGamepadFlags::connected;
-                    if (batteryInfo.BatteryType != BATTERY_TYPE_WIRED) {
-                        pinputGamepads[player].flags |= PinputGamepadFlags::hasBattery;
-                        if (batteryInfo.BatteryLevel == BATTERY_LEVEL_FULL) {
-                            pinputGamepads[player].battery = UINT8_MAX;
-                        }
-                        else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_MEDIUM) {
-                            pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 2 / 3);
-                        }
-                        else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_LOW) {
-                            pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 1 / 3);
+                    if (result != ERROR_SUCCESS) {
+                        std::wcerr << "Couldn't get battery info for player "
+                            << player + 1 << ": ";
+                        printError(result);
+                    }
+                    else {
+                        if (batteryInfo.BatteryType != BATTERY_TYPE_WIRED) {
+                            pinputGamepads[player].flags |= PinputGamepadFlags::hasBattery;
+                            if (batteryInfo.BatteryLevel == BATTERY_LEVEL_FULL) {
+                                pinputGamepads[player].battery = UINT8_MAX;
+                            }
+                            else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_MEDIUM) {
+                                pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 2 / 3);
+                            }
+                            else if (batteryInfo.BatteryLevel == BATTERY_LEVEL_LOW) {
+                                pinputGamepads[player].battery = (uint8_t)((uint16_t)UINT8_MAX * 1 / 3);
+                            }
+                            else {
+                                pinputGamepads[player].battery = 0;
+                            }
                         }
                         else {
                             pinputGamepads[player].battery = 0;
                         }
-                    }
-                    else {
-                        pinputGamepads[player].battery = 0;
                     }
                 }
             }
