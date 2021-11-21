@@ -1,5 +1,12 @@
+.idea
+*.iml
+
 *.vcxproj.user
 .vs
+
+.DS_Store
+._*
+
 /Windows/**/Debug
 /Windows/**/Release
 /Windows/**/*.aps
