@@ -111,6 +111,7 @@ void printError(DWORD error) {
     );
     if (errorMessageSize) {
         std::wcerr << std::wstring(errorMessage) << std::endl;
+        LocalFree(errorMessage);
     }
     else {
         std::wcerr << "FormatMessage failed to format error " << error << " with error " << GetLastError() << std::endl;
