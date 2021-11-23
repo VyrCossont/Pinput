@@ -1,32 +1,32 @@
-use std::convert::TryFrom;
 use std::env;
 use std::fs::OpenOptions;
 use std::path::Path;
-use std::ptr;
-use std::slice;
+
 use std::process::{Command, ExitStatus};
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 
 use anyhow::{anyhow, Result};
-#[cfg(windows)]
 use memchr::memmem;
-#[cfg(windows)]
 use memmap::MmapMut;
+
 #[cfg(windows)]
-use windows::Win32::System::Diagnostics::Debug::{
-    CheckSumMappedFile,
-    FormatMessageW,
-    FORMAT_MESSAGE_ALLOCATE_BUFFER,
-    FORMAT_MESSAGE_FROM_SYSTEM,
-    FORMAT_MESSAGE_IGNORE_INSERTS,
+use {
+    std::convert::TryFrom,
+    std::ptr,
+    std::slice,
+
+    windows::Win32::System::Diagnostics::Debug::{
+        CheckSumMappedFile,
+        FormatMessageW,
+        FORMAT_MESSAGE_ALLOCATE_BUFFER,
+        FORMAT_MESSAGE_FROM_SYSTEM,
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+    },
+    windows::Win32::Foundation::{GetLastError, PWSTR},
+    windows::Win32::System::SystemServices::{LANG_NEUTRAL, SUBLANG_NEUTRAL},
+    windows::Win32::System::Memory::LocalFree,
 };
-#[cfg(windows)]
-use windows::Win32::Foundation::{GetLastError, PWSTR};
-#[cfg(windows)]
-use windows::Win32::System::SystemServices::{LANG_NEUTRAL, SUBLANG_NEUTRAL};
-#[cfg(windows)]
-use windows::Win32::System::Memory::LocalFree;
 
 /// Run platform-specific code-signing or capability-granting tools.
 /// @todo handle cross-builds?
@@ -152,7 +152,7 @@ where UpdateChecksum: FnOnce(&mut MmapMut) -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn update_pe_checksum(executable_path: &Path) -> Result<()> {
+fn update_pe_checksum(_executable_mmap: &mut MmapMut) -> Result<()> {
     Err(anyhow!("Modifying PE checksums currently requires Windows APIs"))
 }
 
@@ -211,7 +211,6 @@ fn update_pe_checksum(executable_mmap: &mut MmapMut) -> Result<()> {
 /// See https://blog.conan.io/2019/09/02/Deterministic-builds-with-C-C++.html
 /// See https://developercommunity.visualstudio.com/t/map-file-to-a-relative-path/1393881
 /// Note that this is only a problem with the MSVC toolchain.
-#[cfg(windows)]
 fn windows_mask(executable_path: &Path) -> Result<()> { 
     mask_paths(executable_path, update_pe_checksum)
 }
