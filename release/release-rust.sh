@@ -73,7 +73,8 @@ pinput_exe_name="pinput${exe_suffix}"
 archive_name="${release_dir}/artifacts/pinput-rust-${os}-${arch}-${version}.zip"
 
 # Clean previous build directory and output archive.
-rm -rf "${rust_build_dir}" "${archive_name}"
+rm -rf "${rust_build_dir}" "${archive_name}" \
+  || true
 
 # Make a release build with Cargo.
 # `cargo` has `--manifest-path=../rust/pinput/Cargo.toml`
@@ -114,7 +115,7 @@ unwanted="$(\
   | grep -i -E "${unwanted_pattern}" \
   || true \
 )"
-if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK}" ]; then
+if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK:-}" ]; then
   printf "Unwanted strings found in %s:\n%s\n" \
     "${rust_build_dir}/${pinput_exe_name}" \
     "${unwanted}" \
@@ -134,7 +135,7 @@ unwanted="$(\
   | grep -i -E "${unwanted_pattern}" \
   || true \
 )"
-if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK}" ]; then
+if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK:-}" ]; then
   printf "Unwanted strings found in %s:\n%s\n" \
     "${archive_name}" \
     "${unwanted}" \
