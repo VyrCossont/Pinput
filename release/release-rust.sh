@@ -67,11 +67,15 @@ else
   user_home="${HOME}"
 fi
 
-# Make a release build with Cargo.
 rust_src="${release_dir}/../rust/pinput"
 rust_build_dir="${rust_src}/target/release"
 pinput_exe_name="pinput${exe_suffix}"
-rm -rf "${rust_build_dir}"
+archive_name="${release_dir}/artifacts/pinput-rust-${os}-${arch}-${version}.zip"
+
+# Clean previous build directory and output archive.
+rm -rf "${rust_build_dir}" "${archive_name}"
+
+# Make a release build with Cargo.
 # `cargo` has `--manifest-path=../rust/pinput/Cargo.toml`
 # to change the working directory, but it doesn't work with `post build`.
 (
@@ -105,33 +109,35 @@ rm -rf "${rust_build_dir}"
 # Check executable for unwanted strings.
 unwanted_pattern="${user_name}|${machine_name}"
 
-unwanted="$(strings_cmd "${rust_build_dir}/${pinput_exe_name}" \
-  | grep -i -E "${unwanted_pattern}")"
-if [ -n "${unwanted}" ]; then
+unwanted="$(\
+  strings_cmd "${rust_build_dir}/${pinput_exe_name}" \
+  | grep -i -E "${unwanted_pattern}" \
+  || true \
+)"
+if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK}" ]; then
   printf "Unwanted strings found in %s:\n%s\n" \
     "${rust_build_dir}/${pinput_exe_name}" \
     "${unwanted}" \
     1>&2
   exit 1
 fi
-end
 
 # Zip it with a descriptive archive name.
 # `zip` doesn't have an option to change the working directory.
-archive_name="${release_dir}/artifacts/pinput-rust-${os}-${arch}-${version}.zip"
 (
   cd "${rust_build_dir}"
-  rm -f "${archive_name}"
   zip_cmd "${archive_name}" "${pinput_exe_name}"
 )
 
-unwanted="$(strings_cmd "${archive_name}" \
-  | grep -i -E "${unwanted_pattern}")"
-if [ -n "${unwanted}" ]; then
+unwanted="$(\
+  strings_cmd "${archive_name}" \
+  | grep -i -E "${unwanted_pattern}" \
+  || true \
+)"
+if [ -n "${unwanted}" ] && [ -z "${BYPASS_STRING_CHECK}" ]; then
   printf "Unwanted strings found in %s:\n%s\n" \
     "${archive_name}" \
     "${unwanted}" \
     1>&2
   exit 1
 fi
-end
