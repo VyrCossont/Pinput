@@ -29,6 +29,11 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
     throw "Unsupported host PROCESSOR_ARCHITECTURE: ${env:PROCESSOR_ARCHITECTURE}!"
 }
 
+# Remove build directories and output archives.
+Remove-Item -Recurse -Force -ErrorAction Ignore "$pinputCliDir\Release"
+Remove-Item -Recurse -Force -ErrorAction Ignore "$pinputCliDir\x64\Release"
+Remove-Item -Recurse -Force "$releaseDir\artifacts\pinput-windows-*"
+
 foreach ($targetArch in "x64", "x86")
 {
     & $msbuildPath "$pinputCliDir\PinputCli.sln" -p:Configuration=Release -p:Platform=$targetArch
