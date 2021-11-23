@@ -2,6 +2,8 @@ use std::convert::TryFrom;
 use std::env;
 use std::fs::OpenOptions;
 use std::path::Path;
+use std::ptr;
+use std::slice;
 use std::process::{Command, ExitStatus};
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -12,7 +14,19 @@ use memchr::memmem;
 #[cfg(windows)]
 use memmap::MmapMut;
 #[cfg(windows)]
-use windows::Win32::System::Diagnostics::Debug::CheckSumMappedFile;
+use windows::Win32::System::Diagnostics::Debug::{
+    CheckSumMappedFile,
+    FormatMessageW,
+    FORMAT_MESSAGE_ALLOCATE_BUFFER,
+    FORMAT_MESSAGE_FROM_SYSTEM,
+    FORMAT_MESSAGE_IGNORE_INSERTS,
+};
+#[cfg(windows)]
+use windows::Win32::Foundation::{GetLastError, PWSTR};
+#[cfg(windows)]
+use windows::Win32::System::SystemServices::{LANG_NEUTRAL, SUBLANG_NEUTRAL};
+#[cfg(windows)]
+use windows::Win32::System::Memory::LocalFree;
 
 /// Run platform-specific code-signing or capability-granting tools.
 /// @todo handle cross-builds?
@@ -158,13 +172,39 @@ fn update_pe_checksum(executable_mmap: &mut MmapMut) -> Result<()> {
             &mut computed_checksum,
         ).as_mut()
     };
-    dbg!(file_checksum);
-    dbg!(computed_checksum);
-    dbg!(image_nt_headers.is_some());
-    // TODO: update PE checksum
-    // See https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/Diagnostics/Debug/struct.IMAGE_NT_HEADERS64.html#structfield.OptionalHeader
-    // See https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/Diagnostics/Debug/struct.IMAGE_OPTIONAL_HEADER64.html#structfield.CheckSum
-    Ok(())
+    if let Some(image_nt_headers) = image_nt_headers {
+        image_nt_headers.OptionalHeader.CheckSum = computed_checksum;
+        Ok(())
+    } else {
+        let message = unsafe {
+            let error = GetLastError();
+            let message_utf16 = PWSTR(ptr::null_mut());
+            let num_wide_chars = FormatMessageW(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER
+                | FORMAT_MESSAGE_FROM_SYSTEM
+                | FORMAT_MESSAGE_IGNORE_INSERTS,
+                ptr::null(),
+                error.0,
+                LANG_NEUTRAL + 1024 * SUBLANG_NEUTRAL,
+                message_utf16,
+                0,
+                ptr::null()
+            );
+            if num_wide_chars == 0 {
+                "CheckSumMappedFile failed, and we couldn't get an error message".to_string()
+            } else {
+                let message = String::from_utf16_lossy(
+                    slice::from_raw_parts(
+                        message_utf16.0,
+                        num_wide_chars as usize
+                    )
+                );
+                LocalFree(message_utf16.0 as isize);
+                message
+            }
+        };
+        Err(anyhow!(message))
+    }
 }
 
 /// As of 2021, MSVC `cl.exe` doesn't have an equivalent of `-ffile-prefix-map`.
