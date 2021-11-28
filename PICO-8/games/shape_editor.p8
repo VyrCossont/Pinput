@@ -8,8 +8,8 @@ __lua__
 
 -- item zero is the color,
 -- items 1-n are pairs of coords
-lines = {}
-cline = nil
+paths = {}
+cpath = nil
 
 function _init()
  grid_init()
@@ -40,14 +40,51 @@ function grid_draw()
   end
  end
 
- -- selected dot
- local cx, cy = unpack(pos)
+ -- current path
  local c = 7
- if cline != nil then
-  c = lines[cline].color
+ local path = {}
+ if cpath != nil then
+  path = paths[cpath]
+  c = path.color
  end
+
+ -- todo: draw every path
+
+ if #path > 0 then
+  -- lines
+  if #path > 1 then
+   for i = 2, #path do
+    local px1, py1 = unpack(path[i - 1])
+    local px2, py2 = unpack(path[i])
+    line(px1 * grid_size, py1 * grid_size, px2 * grid_size, py2 * grid_size, c)
+   end
+  end
+  -- dots
+  for p in all(path) do
+   local px, py = unpack(p)
+   circfill(px * grid_size, py * grid_size, 2, c)
+  end
+ end
+
+ local cx, cy = unpack(pos)
+ if #path > 0 then
+  -- dotted line between last dot and cursor
+  local px, py = unpack(path[#path])
+  -- pick a pattern that won't make the line invisible
+  local theta = 8 * atan2(cx - px, cy - py)
+  if (theta < 1) or (theta > 3 and theta < 5) or (theta > 7) then
+   -- vertical stripes
+   fillp(0b1010101010101010)
+  else
+   -- horizontal stripes
+   fillp(0b1111000011110000)
+  end
+  line(px * grid_size, py * grid_size, cx * grid_size, cy * grid_size, c)
+  fillp()
+ end
+
+ -- cursor
  circ(cx * grid_size, cy * grid_size, 2, c)
- print(c, cx * grid_size, cy * grid_size, 8)
 end
 
 function grid_update60()
@@ -60,10 +97,10 @@ function grid_update60()
  cy = mid(-grid_max, cy, grid_max)
  pos = {cx, cy}
  if btnp(4) then
-  if cline == nil then
+  if cpath == nil then
    palette_init()
   else
-   add(lines[cline], pos)
+   add(paths[cpath], pos)
   end
  end
 end
@@ -83,35 +120,35 @@ function palette_init()
 end
 
 function palette_draw()
- camera()
+ camera(-34, -14)
  fillp()
  clip(34, 14, 60, 80)
 
  -- palette background
  fillp(0b0110110010010011)
- rectfill(34, 14, 94 - 1, 74 - 1, 5 | (13 << 4))
+ rectfill(0, 0, 60 - 1, 60 - 1, 5 | (13 << 4))
  fillp()
 
  -- control area
- rectfill(34, 74, 94 - 1, 94 - 1, 13)
+ rectfill(0, 60, 60 - 1, 80 - 1, 13)
 
  -- palette frame
- rect(34, 14, 94 - 1, 94 - 1, 6)
+ rect(0, 0, 60 - 1, 80 - 1, 6)
 
  -- color swatches
  for i = 0, 3 do
   for j = 0, 3 do
    local c = (i * 4) + j
-   local x = 34 + 1 + 2 * (i + 1) + 12 * i
-   local y = 14 + 1 + 2 * (j + 1) + 12 * j
+   local x = 1 + 2 * (i + 1) + 12 * i
+   local y = 1 + 2 * (j + 1) + 12 * j
    rectfill(x, y, x + 12 - 1, y + 12 - 1, c)
   end
  end
 
  -- currently selected color swatch
  local px, py = unpack(palette_coords)
- local x = 34 + 2 * (px + 1) + 12 * px
- local y = 14 + 2 * (py + 1) + 12 * py
+ local x = 2 * (px + 1) + 12 * px
+ local y = 2 * (py + 1) + 12 * py
  if (py > 3) y += 5
  fillp(0b1010010110100101)
  rect(x, y, x + 12 + 1, y + 12 + 1, 3 | (11 << 4))
@@ -120,8 +157,8 @@ function palette_draw()
  -- chosen color swatch
  if palette_selected != nil then
   local sx, sy = unpack(palette_selected)
-  local x = 34 + 2 * (sx + 1) + 12 * sx
-  local y = 14 + 2 * (sy + 1) + 12 * sy
+  local x = 2 * (sx + 1) + 12 * sx
+  local y = 2 * (sy + 1) + 12 * sy
   fillp(0b1100110000110011)
   rect(x, y, x + 12 + 1, y + 12 + 1, 3 | (11 << 4))
   fillp()
@@ -129,8 +166,8 @@ function palette_draw()
 
  for k, label in pairs({"h", "v", "c", "ok"}) do
   local px = k - 1
-  local x = 34 + 1 + 2 * (px + 1) + 12 * px
-  local y = 74 + 4
+  local x = 1 + 2 * (px + 1) + 12 * px
+  local y = 60 + 4
   rectfill(x, y, x + 12 - 1, y + 12 - 1, 6)
   if px == 3 then
    print(label, x + 2, y + 3, 13)
@@ -153,9 +190,9 @@ function palette_update60()
  if (btnp(1)) px += 1
  if (btnp(2)) py -= 1
  if (btnp(3)) py += 1
- px = mid(0, px, 3)
- -- counts flip controls and commit button
- py = mid(0, py, 4)
+ px %= 4
+ -- line 4 is flip controls and ok button
+ py %= 5
  palette_coords = {px, py}
 
  if btnp(4) then
@@ -182,8 +219,8 @@ end
 -- start a new line and exit palette mode
 function palette_exit()
  local px, py = unpack(palette_selected)
- cline = #lines
- lines[cline] = {
+ cpath = #paths
+ paths[cpath] = {
    ["color"] = (px * 4) + py,
    ["h_flip"] = h_flip,
    ["v_flip"] = v_flip,
