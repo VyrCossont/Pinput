@@ -11,9 +11,16 @@ __lua__
 paths = {}
 cpath = nil
 
+function error_beep()
+ print "\ae-e-..dd"
+end
+
 function _init()
  grid_init()
 end
+
+-->8
+-- grid
 
 function grid_init()
  pos = {0, 0}
@@ -96,6 +103,7 @@ function grid_update60()
  cx = mid(-grid_max, cx, grid_max)
  cy = mid(-grid_max, cy, grid_max)
  pos = {cx, cy}
+
  if btnp(4) then
   if cpath == nil then
    palette_init()
@@ -103,7 +111,69 @@ function grid_update60()
    add(paths[cpath], pos)
   end
  end
+
+ if btnp(5) then
+--  if cpath == nil then
+--   error_beep()
+--  else
+   menu_init()
+--  end
+ end
 end
+
+-->8
+-- menu
+
+function menu_init()
+ _draw = function()
+  grid_draw()
+  menu_draw()
+ end
+ _update60 = menu_update60
+
+ menu_selected = nil
+end
+
+function menu_draw()
+ camera(-64, -64)
+
+ circfill(0, 0, 32 + 2, 0)
+ circfill(0, 0, 32, 6)
+
+ for x = -32, 32 do
+  for y = -32, 32 do
+   local theta = atan2(x, y)
+   if theta > 1/3 and theta < 2/3 and sqrt(x * x + y * y) < 32 + 1 and pget(x, y) == 6 then
+    pset(x, y, 13)
+   end
+  end
+ end
+
+ line(0, 0, 32 * cos(0/3), 32 * sin(0/3), 5)
+ line(0, 0, 32 * cos(1/3), 32 * sin(1/3), 5)
+ line(0, 0, 32 * cos(2/3), 32 * sin(2/3), 5)
+end
+
+function menu_update60()
+
+
+ if btnp(4) then
+  error_beep()
+ end
+
+ if btnp(5) then
+  menu_exit()
+ end
+end
+
+function menu_exit()
+ local saved_pos = pos
+ grid_init()
+ pos = saved_pos
+end
+
+-->8
+-- palette
 
 function palette_init()
  _draw = function()
@@ -207,12 +277,16 @@ function palette_update60()
     close_loop = not close_loop
    elseif px == 3 then
     if palette_selected == nil then
-     print "\ae-e-..dd"
+     error_beep()
     else
      palette_exit()
     end
    end
   end
+ end
+
+ if btnp(5) then
+  grid_init()
  end
 end
 
