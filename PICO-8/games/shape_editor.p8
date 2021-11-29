@@ -265,19 +265,19 @@ end
 
 function palette_draw()
  camera(-34, -14)
- fillp()
- clip(34, 14, 60, 80)
+
+ -- palette shadow
+ clip(34 - 5, 14 - 5, 60 + 5 * 2, 80 + 5 * 2)
+ fillp(0b1010010110100101)
+ rectfill(-5, -5, 60 + 5, 80 + 5, 1)
 
  -- palette background
- fillp(0b0110110010010011)
- rectfill(0, 0, 60 - 1, 60 - 1, 5 | (13 << 4))
+ clip(34, 14, 60, 80)
  fillp()
+ rectfill(0, 0, 60 - 1, 60 - 1, 6)
 
  -- control area
- rectfill(0, 60, 60 - 1, 80 - 1, 13)
-
- -- palette frame
- rect(0, 0, 60 - 1, 80 - 1, 6)
+ rectfill(0, 60, 60 - 1, 80 - 1, 6)
 
  -- color swatches
  for i = 0, 3 do
@@ -308,15 +308,16 @@ function palette_draw()
   fillp()
  end
 
+ -- mode switches and ok button
  for k, label in pairs({"h", "v", "c", "ok"}) do
   local px = k - 1
   local x = 1 + 2 * (px + 1) + 12 * px
   local y = 60 + 4
-  rectfill(x, y, x + 12 - 1, y + 12 - 1, 6)
+  rectfill(x, y, x + 12 - 1, y + 12 - 1, 5)
   if px == 3 then
-   print(label, x + 2, y + 3, 13)
+   print(label, x + 2, y + 3, 6)
   else
-   print("\^w\^t" .. label, x + 3, y + 1, 13)
+   print("\^w\^t" .. label, x + 3, y + 1, 6)
    if (px == 0 and h_flip)
    or (px == 1 and v_flip)
    or (px == 2 and close_loop) then
