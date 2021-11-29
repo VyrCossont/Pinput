@@ -134,8 +134,10 @@ end
 
 function grid_menu_delete()
  if #paths[cpath] > 0 then
-  local last = deli(paths[cpath])
-  pos = last
+  deli(paths[cpath])
+  if #paths[cpath] > 0 then
+   pos = paths[cpath][#paths[cpath]]
+  end
  end
 end
 
@@ -260,11 +262,11 @@ function palette_init()
  palette_selected = nil
  h_flip = false
  v_flip = false
- close_loop = false
 end
 
 function palette_draw()
  camera(-34, -14)
+ local px, py = unpack(palette_coords)
 
  -- palette shadow
  clip(34 - 5, 14 - 5, 60 + 5 * 2, 80 + 5 * 2)
@@ -274,58 +276,73 @@ function palette_draw()
  -- palette background
  clip(34, 14, 60, 80)
  fillp()
- rectfill(0, 0, 60 - 1, 60 - 1, 6)
-
- -- control area
- rectfill(0, 60, 60 - 1, 80 - 1, 6)
+ rectfill(0, 0, 60 - 1, 80 - 1, 6)
 
  -- color swatches
- for i = 0, 3 do
-  for j = 0, 3 do
-   local c = (i * 4) + j
-   local x = 1 + 2 * (i + 1) + 12 * i
-   local y = 1 + 2 * (j + 1) + 12 * j
+ for kx = 0, 3 do
+  for ky = 0, 3 do
+   local c = (kx * 4) + ky
+   local x = 1 + 2 * (kx + 1) + 12 * kx
+   local y = 1 + 2 * (ky + 1) + 12 * ky
    rectfill(x, y, x + 12 - 1, y + 12 - 1, c)
+
+   -- corner box
+   local corner_color = 6
+   local check_color = 5
+
+   local hover = kx == px and ky == py
+   if hover then
+    corner_color = 13
+    check_color = 7
+   end
+
+   local selected = false
+   if palette_selected != nil then
+    local sx, sy = unpack(palette_selected)
+    selected = kx == sx and ky == sy
+   end
+
+   rectfill(x, y, x + 3, y + 3, corner_color)
+   if selected then
+    pal(7, check_color)
+    spr(4, x, y)
+    pal()
+   end
   end
- end
-
- -- currently selected color swatch
- local px, py = unpack(palette_coords)
- local x = 2 * (px + 1) + 12 * px
- local y = 2 * (py + 1) + 12 * py
- if py > 3 then y += 5 end
- fillp(0b1010010110100101)
- rect(x, y, x + 12 + 1, y + 12 + 1, 3 | (11 << 4))
- fillp()
-
- -- chosen color swatch
- if palette_selected != nil then
-  local sx, sy = unpack(palette_selected)
-  local x = 2 * (sx + 1) + 12 * sx
-  local y = 2 * (sy + 1) + 12 * sy
-  fillp(0b1100110000110011)
-  rect(x, y, x + 12 + 1, y + 12 + 1, 3 | (11 << 4))
-  fillp()
  end
 
  -- mode switches and ok button
- for k, label in pairs({"h", "v", "c", "ok"}) do
-  local px = k - 1
-  local x = 1 + 2 * (px + 1) + 12 * px
+ for k, label in pairs({"h", "v", "x", "o"}) do
+  local kx = k - 1
+  local x = 1 + 2 * (kx + 1) + 12 * kx
   local y = 60 + 4
-  rectfill(x, y, x + 12 - 1, y + 12 - 1, 5)
-  if px == 3 then
-   print(label, x + 2, y + 3, 6)
-  else
-   print("\^w\^t" .. label, x + 3, y + 1, 6)
-   if (px == 0 and h_flip)
-   or (px == 1 and v_flip)
-   or (px == 2 and close_loop) then
-    fillp(0b1100110000110011)
-    rect(x - 1, y - 1, x + 12, y + 12, 3 | (11 << 4))
-    fillp()
-   end
+
+  local box_color = 6
+  local fg_color = 5
+
+  local hover = kx == px and 4 == py
+  if hover then
+   box_color = 13
+   fg_color = 7
   end
+
+  rectfill(x, y, x + 12 - 1, y + 12 - 1, box_color)
+  pal(7, fg_color)
+
+  if label == "x" then
+   spr(2, x + 2, y + 2)
+  elseif label == "o" then
+   spr(1, x + 2, y + 2)
+  else
+   print("\^w\^t" .. label, x + 3, y + 1, fg_color)
+  end
+
+  local selected = (kx == 0 and h_flip) or (kx == 1 and v_flip)
+  if selected then
+   spr(4, x, y)
+  end
+
+  pal()
  end
 end
 
@@ -336,7 +353,7 @@ function palette_update60()
  if btnp(2) then py -= 1 end
  if btnp(3) then py += 1 end
  px %= 4
- -- line 4 is flip controls and ok button
+ -- line 4 is flip toggles and cancel/ok buttons
  py %= 5
  palette_coords = {px, py}
 
@@ -349,7 +366,7 @@ function palette_update60()
    elseif px == 1 then
     v_flip = not v_flip
    elseif px == 2 then
-    close_loop = not close_loop
+    grid_init()
    elseif px == 3 then
     if palette_selected == nil then
      error_beep()
@@ -372,7 +389,6 @@ function palette_exit()
    color = (px * 4) + py,
    h_flip = h_flip,
    v_flip = v_flip,
-   close_loop = close_loop,
  })
  cpath = #paths
  grid_init()
@@ -380,11 +396,11 @@ end
 
 
 __gfx__
-00000000000077700077770000000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000077700777777000007770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000077707700077700077777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000007077707700707700777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000077777707707007707777700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700777777007770007777777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000077770000777777007770007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000007000000077770000777777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000007770077770000000700000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000007770777777000007770707000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000007777700077700077777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000000707777700707700777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000007777777707007707777700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700077777707770007777777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000007777000777777007770007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000700000077770000777777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
