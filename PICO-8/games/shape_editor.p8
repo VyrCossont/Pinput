@@ -6,10 +6,13 @@ __lua__
 
 -- globals
 
--- item zero is the color,
+-- named items are color and modes,
 -- items 1-n are pairs of coords
 paths = {}
 cpath = nil
+
+-- cursor position
+pos = {0, 0}
 
 function error_beep()
  print "\ae-e-..dd"
@@ -23,7 +26,6 @@ end
 -- grid
 
 function grid_init()
- pos = {0, 0}
  grid_size = 7
  grid_max = 64 \ grid_size
 
@@ -47,35 +49,34 @@ function grid_draw()
   end
  end
 
- -- current path
+ -- lines
+ for path in all(paths) do
+  if #path > 1 then
+   for i = 2, #path do
+    local px1, py1 = unpack(path[i - 1])
+    local px2, py2 = unpack(path[i])
+    line(
+     px1 * grid_size,
+     py1 * grid_size,
+     px2 * grid_size,
+     py2 * grid_size,
+     path.color
+    )
+   end
+  end
+ end
+
+ -- current path and cursor
  local c = 7
  local path = {}
  if cpath != nil then
   path = paths[cpath]
   c = path.color
  end
-
- -- todo: draw every path
-
- if #path > 0 then
-  -- lines
-  if #path > 1 then
-   for i = 2, #path do
-    local px1, py1 = unpack(path[i - 1])
-    local px2, py2 = unpack(path[i])
-    line(px1 * grid_size, py1 * grid_size, px2 * grid_size, py2 * grid_size, c)
-   end
-  end
-  -- dots
-  for p in all(path) do
-   local px, py = unpack(p)
-   circfill(px * grid_size, py * grid_size, 2, c)
-  end
- end
-
  local cx, cy = unpack(pos)
+
+ -- dotted line between end of path and cursor
  if #path > 0 then
-  -- dotted line between last dot and cursor
   local px, py = unpack(path[#path])
   -- pick a pattern that won't make the line invisible
   local theta = 8 * atan2(cx - px, cy - py)
@@ -90,16 +91,22 @@ function grid_draw()
   fillp()
  end
 
+ -- dots
+ for p in all(path) do
+  local px, py = unpack(p)
+  circfill(px * grid_size, py * grid_size, 2, c)
+ end
+
  -- cursor
  circ(cx * grid_size, cy * grid_size, 2, c)
 end
 
 function grid_update60()
  local cx, cy = unpack(pos)
- if (btnp(0)) cx -= 1
- if (btnp(1)) cx += 1
- if (btnp(2)) cy -= 1
- if (btnp(3)) cy += 1
+ if btnp(0) then cx -= 1 end
+ if btnp(1) then cx += 1 end
+ if btnp(2) then cy -= 1 end
+ if btnp(3) then cy += 1 end
  cx = mid(-grid_max, cx, grid_max)
  cy = mid(-grid_max, cy, grid_max)
  pos = {cx, cy}
@@ -113,11 +120,22 @@ function grid_update60()
  end
 
  if btnp(5) then
---  if cpath == nil then
---   error_beep()
---  else
+  if cpath == nil then
+   error_beep()
+  else
    menu_init()
---  end
+  end
+ end
+end
+
+function grid_menu_finish()
+ cpath = nil
+end
+
+function grid_menu_delete()
+ if #paths[cpath] > 0 then
+  local last = deli(paths[cpath])
+  pos = last
  end
 end
 
@@ -131,45 +149,101 @@ function menu_init()
  end
  _update60 = menu_update60
 
+ menu_items = {
+  {
+   sprite=1,
+   label="finish",
+   fn=grid_menu_finish,
+  },
+  {
+   sprite=2,
+   label="cancel",
+   fn=function() end,
+  },
+  {
+   sprite=3,
+   label="delete",
+   fn=grid_menu_delete,
+  },
+ }
  menu_selected = nil
 end
 
 function menu_draw()
  camera(-64, -64)
+ local r = 32
+ local n = #menu_items
 
- circfill(0, 0, 32 + 2, 0)
- circfill(0, 0, 32, 6)
+ -- shadow and pie
+ fillp(0b1010010110100101)
+ circfill(0, 0, r + 5, 1)
+ fillp()
+ circfill(0, 0, r, 6)
 
- for x = -32, 32 do
-  for y = -32, 32 do
-   local theta = atan2(x, y)
-   if theta > 1/3 and theta < 2/3 and sqrt(x * x + y * y) < 32 + 1 and pget(x, y) == 6 then
-    pset(x, y, 13)
+ -- highlight selected wedge
+ if menu_selected != nil then
+  for x = -r, r do
+   for y = -r, r do
+    local theta = atan2(x, y)
+    if theta >= (menu_selected - 1) / n
+    and theta < menu_selected / n
+    and sqrt(x * x + y * y) < r + 1
+    and pget(x, y) == 6 then
+     pset(x, y, 13)
+    end
    end
   end
  end
 
- line(0, 0, 32 * cos(0/3), 32 * sin(0/3), 5)
- line(0, 0, 32 * cos(1/3), 32 * sin(1/3), 5)
- line(0, 0, 32 * cos(2/3), 32 * sin(2/3), 5)
+ -- wedge separators
+ for i = 1, n do
+  line(0, 0, r * cos((i - 1) / n), r * sin((i - 1) / n), 5)
+  if i != menu_selected then
+   pal(7, 5)
+  end
+  local x = r * 0.55 * cos((i - 0.5) / n)
+  local y = r * 0.55 * sin((i - 0.5) / n)
+  spr(menu_items[i].sprite, x - 4, y - 7)
+  print(menu_items[i].label, x - #menu_items[i].label * 2, y + 2, 7)
+  pal()
+ end
 end
 
 function menu_update60()
+ if btnp(0) or btnp(2) then
+  if menu_selected == nil then
+   menu_selected = #menu_items
+  else
+   menu_selected += 1
+   if menu_selected > #menu_items then menu_selected = 1 end
+  end
+ end
 
+ if btnp(1) or btnp(3) then
+  if menu_selected == nil then
+   menu_selected = 1
+  else
+   menu_selected -= 1
+   if menu_selected < 1 then menu_selected = #menu_items end
+  end
+ end
 
  if btnp(4) then
-  error_beep()
+  if menu_selected == nil then
+   error_beep()
+  else
+   menu_items[menu_selected].fn()
+   menu_exit()
+  end
  end
 
  if btnp(5) then
-  menu_exit()
+  error_beep()
  end
 end
 
 function menu_exit()
- local saved_pos = pos
  grid_init()
- pos = saved_pos
 end
 
 -->8
@@ -219,7 +293,7 @@ function palette_draw()
  local px, py = unpack(palette_coords)
  local x = 2 * (px + 1) + 12 * px
  local y = 2 * (py + 1) + 12 * py
- if (py > 3) y += 5
+ if py > 3 then y += 5 end
  fillp(0b1010010110100101)
  rect(x, y, x + 12 + 1, y + 12 + 1, 3 | (11 << 4))
  fillp()
@@ -256,10 +330,10 @@ end
 
 function palette_update60()
  local px, py = unpack(palette_coords)
- if (btnp(0)) px -= 1
- if (btnp(1)) px += 1
- if (btnp(2)) py -= 1
- if (btnp(3)) py += 1
+ if btnp(0) then px -= 1 end
+ if btnp(1) then px += 1 end
+ if btnp(2) then py -= 1 end
+ if btnp(3) then py += 1 end
  px %= 4
  -- line 4 is flip controls and ok button
  py %= 5
@@ -293,21 +367,23 @@ end
 -- start a new line and exit palette mode
 function palette_exit()
  local px, py = unpack(palette_selected)
+ add(paths, {
+   color = (px * 4) + py,
+   h_flip = h_flip,
+   v_flip = v_flip,
+   close_loop = close_loop,
+ })
  cpath = #paths
- paths[cpath] = {
-   ["color"] = (px * 4) + py,
-   ["h_flip"] = h_flip,
-   ["v_flip"] = v_flip,
-   ["close_loop"] = close_loop,
- }
  grid_init()
 end
 
 
 __gfx__
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077700077770000000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077700777777000007770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000077707700077700077777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000007077707700707700777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000077777707707007707777700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700777777007770007777777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000077770000777777007770007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000007000000077770000777777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
