@@ -38,6 +38,10 @@ function grid_draw()
  cls(0)
  camera(-64, -64)
 
+ -- mirror lines
+ line(-64, 0, 64, 0, 1)
+ line(0, -64, 0, 64, 1)
+
  -- grid dots
  for i = 0, 64, grid_size do
   for j = 0, 64, grid_size do
@@ -51,17 +55,30 @@ function grid_draw()
 
  -- lines
  for path in all(paths) do
+  local transforms = {{1, 1}}
+  if path.h_flip then
+   add(transforms, {-1, 1})
+  end
+  if path.v_flip then
+   add(transforms, {1, -1})
+  end
+  if path.h_flip and path.v_flip then
+   add(transforms, {-1, -1})
+  end
   if #path > 1 then
    for i = 2, #path do
     local px1, py1 = unpack(path[i - 1])
     local px2, py2 = unpack(path[i])
-    line(
-     px1 * grid_size,
-     py1 * grid_size,
-     px2 * grid_size,
-     py2 * grid_size,
-     path.color
-    )
+    for transform in all(transforms) do
+     local tx, ty = unpack(transform)
+     line(
+      px1 * grid_size * tx,
+      py1 * grid_size * ty,
+      px2 * grid_size * tx,
+      py2 * grid_size * ty,
+      path.color
+     )
+    end
    end
   end
  end
@@ -87,11 +104,30 @@ function grid_draw()
    -- horizontal stripes
    fillp(0b1111000011110000)
   end
-  line(px * grid_size, py * grid_size, cx * grid_size, cy * grid_size, c)
+  local transforms = {{1, 1}}
+  if path.h_flip then
+   add(transforms, {-1, 1})
+  end
+  if path.v_flip then
+   add(transforms, {1, -1})
+  end
+  if path.h_flip and path.v_flip then
+   add(transforms, {-1, -1})
+  end
+  for transform in all(transforms) do
+   local tx, ty = unpack(transform)
+   line(
+    px * grid_size * tx,
+    py * grid_size * ty,
+    cx * grid_size * tx,
+    cy * grid_size * ty,
+    c
+   )
+  end
   fillp()
  end
 
- -- dots
+ -- dots on original (non-mirrored) path only
  for p in all(path) do
   local px, py = unpack(p)
   circfill(px * grid_size, py * grid_size, 2, c)
