@@ -18,7 +18,118 @@ function error_beep()
  print "\ae-e-..dd"
 end
 
+-- serialize as Lua code
+function serialize_paths_lua()
+ local s = ""
+ for path in all(paths) do
+  s ..= " {\n"
+  s ..= "  color = " .. tostr(path.color) .. ",\n"
+  s ..= "  mirror_h = " .. tostr(path.mirror_h) .. ",\n"
+  s ..= "  mirror_v = " .. tostr(path.mirror_v) .. ",\n"
+  for point in all(path) do
+   local x, y = unpack(point)
+   s ..= "  {" .. tostr(x) .. ", " .. tostr(y) .. "},\n"
+  end
+  s ..= " },\n"
+ end
+ return s
+end
+
+-- serialize packed binary format
+-- # of paths
+-- path:
+--  # of points in path
+--  meta byte
+--   bit 7: mirror_h
+--   bit 6: mirror_v
+--   bit 5: reserved
+--   bits 4-0: color
+--  points:
+--   signed byte for x
+--   signed byte for y
+function serialize_paths_bin()
+ local s = ""
+ s ..= chr(#paths)
+ for path in all(paths) do
+  s ..= chr(#path)
+  local meta = path.color
+  if path.mirror_h then
+   meta |= 1 << 7
+  end
+  if path.mirror_v then
+   meta |= 1 << 6
+  end
+  s ..= chr(meta)
+  for point in all(path) do
+   local x, y = unpack(point)
+   s ..= chr(x)
+   s ..= chr(y)
+  end
+ end
+ return s
+end
+
+-- serialize packed binary format as space-separated hex bytes
+function serialize_paths_hex()
+ local s = ""
+ local bytes = serialize_paths_bin()
+ for i = 1, #bytes do
+  s ..= " " .. sub(tostr(ord(sub(bytes, i, i + 1)), 1), 5, 6)
+ end
+ return sub(s, 2)
+end
+
+function export_paths_lua()
+ printh(serialize_paths_lua(), "@clip")
+end
+
+function export_paths_hex()
+ printh(serialize_paths_hex(), "@clip")
+end
+
+function save_paths_to_cartdata()
+ local bytes = serialize_paths_bin()
+ if #bytes <= 256 then
+  ?"\^!5e00" .. bytes
+ else
+  error_beep()
+ end
+end
+
+function load_paths_from_cartdata()
+ paths = {}
+ cpath = nil
+
+ local ptr = 0x5e00
+ function next()
+  assert(ptr < 0x5f00, "read past end of cartdata!")
+  local byte = @ptr
+  ptr += 1
+  return byte
+ end
+
+ local num_paths = next()
+ for _ = 1, num_paths do
+  local path = {}
+  local num_points = next()
+
+  local meta = next()
+  path.color = meta & 0b11111
+  path.mirror_h = 1 == (meta >> 7) & 1
+  path.mirror_v = 1 == (meta >> 6) & 1
+
+  for _ = 1, num_points do
+   local x = next()
+   local y = next()
+   add(path, {x, y})
+  end
+
+  add(paths, path)
+ end
+end
+
 function _init()
+ cartdata("vyr_cossont_shape_editor")
  grid_init()
 end
 
@@ -31,6 +142,20 @@ function grid_init()
 
  _draw = grid_draw
  _update60 = grid_update60
+end
+
+function path_transforms(path)
+ local transforms = {{1, 1}}
+ if path.mirror_h then
+  add(transforms, {-1, 1})
+ end
+ if path.mirror_v then
+  add(transforms, {1, -1})
+ end
+ if path.mirror_h and path.mirror_v then
+  add(transforms, {-1, -1})
+ end
+ return transforms
 end
 
 function grid_draw()
@@ -55,21 +180,11 @@ function grid_draw()
 
  -- lines
  for path in all(paths) do
-  local transforms = {{1, 1}}
-  if path.h_flip then
-   add(transforms, {-1, 1})
-  end
-  if path.v_flip then
-   add(transforms, {1, -1})
-  end
-  if path.h_flip and path.v_flip then
-   add(transforms, {-1, -1})
-  end
   if #path > 1 then
    for i = 2, #path do
     local px1, py1 = unpack(path[i - 1])
     local px2, py2 = unpack(path[i])
-    for transform in all(transforms) do
+    for transform in all(path_transforms(path)) do
      local tx, ty = unpack(transform)
      line(
       px1 * grid_size * tx,
@@ -104,17 +219,7 @@ function grid_draw()
    -- horizontal stripes
    fillp(0b1111000011110000)
   end
-  local transforms = {{1, 1}}
-  if path.h_flip then
-   add(transforms, {-1, 1})
-  end
-  if path.v_flip then
-   add(transforms, {1, -1})
-  end
-  if path.h_flip and path.v_flip then
-   add(transforms, {-1, -1})
-  end
-  for transform in all(transforms) do
+  for transform in all(path_transforms(path)) do
    local tx, ty = unpack(transform)
    line(
     px * grid_size * tx,
@@ -149,22 +254,105 @@ function grid_update60()
 
  if btnp(4) then
   if cpath == nil then
-   palette_init()
+   error_beep()
   else
    add(paths[cpath], pos)
   end
  end
 
  if btnp(5) then
+   local menu_items = {}
   if cpath == nil then
-   error_beep()
+   menu_items =
+   {
+    {
+     sprite=5,
+     label="path",
+     fn=
+      function()
+       menu_exit()
+       palette_init()
+      end,
+    },
+    {
+     sprite=2,
+     label="cancel",
+     fn=menu_exit,
+    },
+    {
+     sprite=7,
+     label="lUA",
+     fn=
+      function()
+       export_paths_lua()
+       menu_exit()
+      end,
+    },
+    {
+     sprite=7,
+     label="hex",
+     fn=
+      function()
+       export_paths_hex()
+       menu_exit()
+      end,
+    },
+    {
+     sprite=9,
+     label="load",
+     fn=
+      function()
+       load_paths_from_cartdata()
+       menu_exit()
+      end,
+    },
+    {
+     sprite=9,
+     label="save",
+     fn=
+      function()
+       save_paths_to_cartdata()
+       menu_exit()
+      end,
+    },
+   }
   else
-   menu_init()
+   menu_items =
+   {
+    {
+     sprite=1,
+     label="finish",
+     fn=
+      function()
+       grid_menu_finish()
+       menu_exit()
+      end,
+    },
+    {
+     sprite=2,
+     label="cancel",
+     fn=menu_exit,
+    },
+    {
+     sprite=3,
+     label="delete",
+     fn=
+      function()
+       grid_menu_delete()
+       menu_exit()
+      end,
+    },
+   }
   end
+  menu_init(menu_items)
  end
 end
 
 function grid_menu_finish()
+ -- don't save zero-length paths
+ if #paths[cpath] == 0 then
+  deli(paths, cpath)
+ end
  cpath = nil
 end
 
@@ -180,31 +368,15 @@ end
 -->8
 -- menu
 
-function menu_init()
+function menu_init(items)
+ menu_items = items
+ menu_selected = nil
+
  _draw = function()
   grid_draw()
   menu_draw()
  end
  _update60 = menu_update60
-
- menu_items = {
-  {
-   sprite=1,
-   label="finish",
-   fn=grid_menu_finish,
-  },
-  {
-   sprite=2,
-   label="cancel",
-   fn=function() end,
-  },
-  {
-   sprite=3,
-   label="delete",
-   fn=grid_menu_delete,
-  },
- }
- menu_selected = nil
 end
 
 function menu_draw()
@@ -233,16 +405,26 @@ function menu_draw()
   end
  end
 
- -- wedge separators
+ -- for each menu choice
  for i = 1, n do
+  -- wedge separator
   line(0, 0, r * cos((i - 1) / n), r * sin((i - 1) / n), 5)
+
+  -- icon
   if i != menu_selected then
    pal(7, 5)
   end
   local x = r * 0.55 * cos((i - 0.5) / n)
   local y = r * 0.55 * sin((i - 0.5) / n)
   spr(menu_items[i].sprite, x - 4, y - 7)
-  print(menu_items[i].label, x - #menu_items[i].label * 2, y + 2, 7)
+
+  -- label
+  local label = menu_items[i].label
+  local max_line_chars = 0
+  for label_line in all(split(label, "\n")) do
+   max_line_chars = max(max_line_chars, #label_line)
+  end
+  print(label, x - max_line_chars * 2, y + 2, 7)
   pal()
  end
 end
@@ -271,7 +453,6 @@ function menu_update60()
    error_beep()
   else
    menu_items[menu_selected].fn()
-   menu_exit()
   end
  end
 
@@ -296,8 +477,8 @@ function palette_init()
 
  palette_coords = {0, 0}
  palette_selected = nil
- h_flip = false
- v_flip = false
+ mirror_h = false
+ mirror_v = false
 end
 
 function palette_draw()
@@ -373,7 +554,7 @@ function palette_draw()
    print("\^w\^t" .. label, x + 3, y + 1, fg_color)
   end
 
-  local selected = (kx == 0 and h_flip) or (kx == 1 and v_flip)
+  local selected = (kx == 0 and mirror_h) or (kx == 1 and mirror_v)
   if selected then
    spr(4, x, y)
   end
@@ -398,9 +579,9 @@ function palette_update60()
    palette_selected = {unpack(palette_coords)}
   else
    if px == 0 then
-    h_flip = not h_flip
+    mirror_h = not mirror_h
    elseif px == 1 then
-    v_flip = not v_flip
+    mirror_v = not mirror_v
    elseif px == 2 then
     grid_init()
    elseif px == 3 then
@@ -414,7 +595,7 @@ function palette_update60()
  end
 
  if btnp(5) then
-  grid_init()
+  error_beep()
  end
 end
 
@@ -423,8 +604,8 @@ function palette_exit()
  local px, py = unpack(palette_selected)
  add(paths, {
    color = (px * 4) + py,
-   h_flip = h_flip,
-   v_flip = v_flip,
+   mirror_h = mirror_h,
+   mirror_v = mirror_v,
  })
  cpath = #paths
  grid_init()
@@ -432,11 +613,11 @@ end
 
 
 __gfx__
-00000000000007770077770000000700000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000007770777777000007770707000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000007777700077700077777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000707777700707700777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000007777777707007707777700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700077777707770007777777070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000007777000777777007770007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000700000077770000777777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000007770077770000000700000700000000000000000000000770007777777700000000000000000000000000000000000000000000000000000000
+00000000000007770777777000007770707000000007700000000000007777007000000700000070000000000000000000000000000000000000000000000000
+00700700000007777700077700077777070000000007700000000000077777707077770700007777000000000000000000000000000000000000000000000000
+00077000000707777700707700777770000000000777777007777770000770007000000700777777000000000000000000000000000000000000000000000000
+00077000007777777707007707777700000000000777777007777770700770077777777777777770000000000000000000000000000000000000000000000000
+00700700077777707770007777777070000000000007700000000000700770077700007777777070000000000000000000000000000000000000000000000000
+00000000007777000777777007770007000000000007700000000000700000070700007707707000000000000000000000000000000000000000000000000000
+00000000000700000077770000777777000000000000000000000000777777770077777700700000000000000000000000000000000000000000000000000000
