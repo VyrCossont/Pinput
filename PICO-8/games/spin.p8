@@ -79,11 +79,25 @@ end
 -->8
 -- new format data
 
--- direct translaton of
+-- direct translation of
 -- https://en.wikipedia.org/wiki/Xiaolin_Wu%27s_line_algorithm
 function aaline(x0, y0, x1, y1, c)
- function plot(x, y, z)
+ function plot_classic(x, y, z)
   pset(x, y, ({0, 1, 5, 13, 6, 7})[1 + ceil(z * 5)])
+ end
+
+ -- compositing version
+ function plot(x, y, z)
+  local ramp = {0, 1, 5, 13, 6, 7}
+  local prev = pget(x, y)
+  local prev_index = 1
+  for i = 1, #ramp do
+   if ramp[i] == prev then
+    prev_index = i
+    break
+   end
+  end
+  pset(x, y, ramp[min(#ramp, prev_index + ceil(z * (#ramp - 1)))])
  end
 
  -- integer part of x
