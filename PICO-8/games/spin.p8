@@ -60,12 +60,13 @@ end
 
 function _draw()
  cls()
- camera(-64, -64)
 
  if not pi_is_inited() then
   ?"waiting for pinput connection..."
   return
  end
+
+ camera(-64, -64)
 
  for dart in all(darts) do
   local dart_theta = atan2(dart.v.x, dart.v.y)
@@ -77,6 +78,88 @@ end
 
 -->8
 -- new format data
+
+-- direct translaton of
+-- https://en.wikipedia.org/wiki/Xiaolin_Wu%27s_line_algorithm
+function aaline(x0, y0, x1, y1, c)
+ function plot(x, y, z)
+  pset(x, y, ({0, 1, 5, 13, 6, 7})[1 + ceil(z * 5)])
+ end
+
+ -- integer part of x
+ function ipart(x) return flr(x) end
+
+ function round(x) return ipart(x + 0.5) end
+
+ -- fractional part of x
+ function fpart(x) return x - flr(x) end
+
+ function rfpart(x) return 1 - fpart(x) end
+
+ local steep = abs(y1 - y0) > abs(x1 - x0)
+
+ if steep then
+  x0, y0 = y0, x0
+  x1, y1 = y1, x1
+ end
+ if x0 > x1 then
+  x0, x1 = x1, x0
+  y0, y1 = y1, y0
+ end
+
+ local dx = x1 - x0
+ local dy = y1 - y0
+ local gradient = dy / dx
+ if dx == 0 then
+  gradient = 1.0
+ end
+
+ -- handle first endpoint
+ local xend = round(x0)
+ local yend = y0 + gradient
+ local xgap = rfpart(x0 + 0.5)
+ -- this will be used in the main loop
+ local xpxl1 = xend
+ local ypxl1 = ipart(yend)
+ if steep then
+  plot(ypxl1, xpxl1, rfpart(yend) * xgap)
+  plot(ypxl1 + 1, xpxl1, fpart(yend) * xgap)
+ else
+  plot(xpxl1, ypxl1, rfpart(yend) * xgap)
+  plot(xpxl1, ypxl1+1, fpart(yend) * xgap)
+ end
+ local intery = yend + gradient
+
+ -- handle second endpoint
+ xend = round(x1)
+ yend = y1 + gradient + (xend - x1)
+ xgap = fpart(x1 + 0.5)
+ -- this will be used in the main loop
+ local xpxl2 = xend
+ local ypxl2 = ipart(yend)
+ if steep then
+  plot(ypxl2, xpxl2, rfpart(yend) * xgap)
+  plot(ypxl2 + 1, xpxl2, fpart(yend) * xgap)
+ else
+  plot(xpxl2, ypxl2, rfpart(yend) * xgap)
+  plot(xpxl2, ypxl2 + 1, fpart(yend) * xgap)
+ end
+
+ -- main loop
+ if steep then
+  for x = xpxl1 + 1, xpxl2 - 1 do
+   plot(ipart(intery), x, rfpart(intery))
+   plot(ipart(intery) + 1, x, fpart(intery))
+   intery = intery + gradient
+  end
+ else
+  for x = xpxl1 + 1, xpxl2 - 1 do
+   plot(x, ipart(intery), rfpart(intery))
+   plot(x, ipart(intery) + 1, fpart(intery))
+   intery = intery + gradient
+  end
+ end
+end
 
 -- draw transformed vector shape
 -- todo: is it faster if we use raw memory instead of tables?
@@ -102,7 +185,7 @@ function vspr(shape, ox, oy, sx, sy, r)
     local x1, y1 = transform(unpack(path[1]))
     for i = 2, #path do
      local x2, y2 = transform(unpack(path[i]))
-     line(x1, y1, x2, y2, path.color)
+     aaline(x1, y1, x2, y2, path.color)
      x1 = x2
      y1 = y2
     end
