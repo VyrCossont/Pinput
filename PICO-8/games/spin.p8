@@ -24,7 +24,7 @@ function pi_stick(s, pl)
 end
 
 function _init()
-
+ pi_init()
 end
 
 function _update60()
