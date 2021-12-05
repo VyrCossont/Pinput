@@ -107,10 +107,10 @@ function _draw()
 
  for dart in all(darts) do
   local dart_theta = atan2(dart.v.x, dart.v.y)
-  vspr(shape_dart, dart.p.x, dart.p.y, 2, 2, dart_theta)
+  vspr(shape_dart, dart.p.x, dart.p.y, 1, 1, dart_theta)
  end
  
- vspr(shape_claw, 0, 0, 3, 3, theta)
+ vspr(shape_claw, 0, 0, 1, 1, theta)
 
  -- reset camera for HUD
  camera()
@@ -204,18 +204,27 @@ shape_dart = {
 shape_splitter = {
  {
   color = 14,
-  mirror_h = true,
-  mirror_v = true,
-  { 0, 6 },
-  { 6, 6 },
-  { 6, 0 },
+  mirror_h = false,
+  mirror_v = false,
+  {-1, -1},
+  {1, -1},
+  {1, 1},
+  {-1, 1},
+  {-1, -1},
  },
  {
   color = 14,
-  mirror_h = true,
-  mirror_v = true,
-  { 6, 6 },
-  { 0, 0 },
+  mirror_h = false,
+  mirror_v = false,
+  {-1, -1},
+  {1, 1},
+ },
+ {
+  color = 14,
+  mirror_h = false,
+  mirror_v = false,
+  {1, -1},
+  {-1, 1},
  },
 }
 
@@ -224,43 +233,55 @@ shape_pinwheel = {
   color = 13,
   mirror_h = false,
   mirror_v = false,
-  { 0, 0 },
-  { 0, -6 },
-  { -6, -6 },
-  { 0, 0 },
-  { 0, 0 },
-  { 0, 0 },
-  { -6, 0 },
-  { -6, 6 },
-  { 0, 0 },
-  { 0, 6 },
-  { 6, 6 },
-  { 0, 0 },
-  { 6, 0 },
-  { 6, -6 },
-  { 0, 0 },
+  {0, 0},
+  {0, -1},
+  {-1, -1},
+  {0, 0},
+  {-1, 0},
+  {-1, 1},
+  {0, 0},
+  {0, 1},
+  {1, 1},
+  {0, 0},
+  {1, 0},
+  {1, -1},
+  {0, 0},
  },
 }
 
 shape_leprechaun = {
  {
   color = 11,
-  mirror_h = true,
-  mirror_v = true,
-  { 0, 6 },
-  { 6, 6 },
-  { 6, 0 },
-  { 0, 6 },
+  mirror_h = false,
+  mirror_v = false,
+  {-1, -1},
+  {-1, 1},
+  {1, 1},
+  {1, -1},
+  {-1, -1},
+ },
+ {
+  color = 11,
+  mirror_h = false,
+  mirror_v = false,
+  {-1, 0},
+  {0, -1},
+  {1, 0},
+  {0, 1},
+  {-1, 0},
  },
 }
 
 shape_diamond = {
  {
   color = 12,
-  mirror_h = true,
-  mirror_v = true,
-  { -8, 0 },
-  { 0, -8 },
+  mirror_h = false,
+  mirror_v = false,
+  {-1, 0},
+  {0, -1},
+  {1, 0},
+  {0, 1},
+  {-1, 0},
  },
 }
 
