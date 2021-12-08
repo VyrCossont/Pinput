@@ -2,6 +2,33 @@
 
 ![A game controller with a circled letter P where the guide/home/Xbox/PS button would be.](logo-128.png)
 
+[//]: # (brew install github-markdown-toc)
+[//]: # (gh-md-toc --hide-header --hide-footer --start-depth 1 --no-escape README.md)
+
+[//]: # (start ToC)
+
+* [Introduction](#introduction)
+* [Instructions](#instructions)
+  * [Rust](#rust)
+  * [macOS](#macos)
+  * [Windows](#windows)
+  * [web](#web)
+    * [web extension](#web-extension)
+  * [PICO-8 development](#pico-8-development)
+* [Current status](#current-status)
+  * [Rust](#rust-1)
+  * [macOS](#macos-1)
+  * [Windows](#windows-1)
+  * [web](#web-1)
+    * [web extension](#web-extension-1)
+* [Future goals](#future-goals)
+* [Development notes](#development-notes)
+* [Licensing and attributions](#licensing-and-attributions)
+
+[//]: # (end ToC)
+
+## Introduction
+
 Ever wish [PICO-8](https://www.lexaloffle.com/pico-8.php) had dual analog stick support? Me too. Pinput is a Lua library that works with PICO-8's GPIO memory area and an external helper app to provide [XInput](https://docs.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput)-like gamepad support to an unmodifed copy of PICO-8. This gets you two analog sticks, two analog triggers, up to 16 digital buttons, and even rumble support, for up to 8 gamepads. Pinput supports macOS, Windows, Linux, Chrome, Firefox, and Safari.
 
 [![The author demonstrating the web version of Pinput by moving gamepad](docs/Pinput-demo-web.jpg)](https://raw.githubusercontent.com/VyrCossont/Pinput/main/docs/Pinput-demo-web.mp4)
