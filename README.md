@@ -75,7 +75,7 @@ Check out this repo, install [Webpack](https://webpack.js.org/), run the followi
 ./release/release-web-extensions.sh
 ```
 
-…and then install the local copy of the extension from the [`release/artifacts/pinput-web-extension-mv2`](release/artifacts/pinput-web-extension-mv2) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/), or the [`release/artifacts/pinput-web-extension-mv3`](release/artifacts/pinput-web-extension-mv3) folder according to the instructions for [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest). (The "mv2"/Manivest v2 version will also work for Chrome [through 2022](https://developer.chrome.com/docs/extensions/mv3/mv2-sunset/).)
+…and then install the local copy of the extension from the [`release/artifacts/pinput-web-extension-mv2`](release/artifacts/pinput-web-extension-mv2) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/), or the [`release/artifacts/pinput-web-extension-mv3`](release/artifacts/pinput-web-extension-mv3) folder according to the instructions for [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest). (The `mv2`/Manifest v2 version will also work for Chrome [through 2022](https://developer.chrome.com/docs/extensions/mv3/mv2-sunset/).)
 
 ### PICO-8 development
 
