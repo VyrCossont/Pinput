@@ -17,5 +17,6 @@
 /rust/pinput/target
 
 /web/extension/pinput-extension.js
+/web/extension/logo-*.png
 
 /release/artifacts/*

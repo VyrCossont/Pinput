@@ -25,17 +25,9 @@ if [ -z "${pico8_path}" ]; then
 fi
 
 # Export .p8.png version.
-# Has to be done manually.
-echo 'PICO-8 will launch.'
-echo 'Press Esc.'
-echo 'Type: save pinput_tester.p8.png'
-echo 'Press Return.'
-echo 'If prompted to overwrite, press Y.'
-echo 'Type: shutdown'
-echo 'Press Return.'
 "${pico8_path}" \
   "${pico8_src_dir}/pinput_tester.p8" \
-  -root_path "${pico8_src_dir}"
+  -export "${pico8_src_dir}/pinput_tester.p8.png"
 
 # Export HTML version.
 "${pico8_path}" \

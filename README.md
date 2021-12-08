@@ -65,15 +65,17 @@ Want to try it right now? Connect a gamepad and [run the gamepad test cartridge 
 
 Alternatively, check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/docs/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
 
-### web extension
+#### web extension
 
-Under development. Check out this repo, install [Webpack](https://webpack.js.org/), run the following command from the root of the repo:
+The web extension lets you use Pinput with the web player on the [Lexaloffle BBS](https://www.lexaloffle.com/bbs/?cat=7).
+
+Check out this repo, install [Webpack](https://webpack.js.org/), run the following command from the root of the repo:
 
 ```bash
-webpack --config web/webpack.config.js
+./release/release-web-extensions.sh
 ```
 
-…and then install the local copy of the extension from the [`web/extension`](web/extension) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) (or [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest), but it probably won't work in Chrome).
+…and then install the local copy of the extension from the [`release/artifacts/pinput-web-extension-mv2`](release/artifacts/pinput-web-extension-mv2) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/), or the [`release/artifacts/pinput-web-extension-mv3`](release/artifacts/pinput-web-extension-mv3) folder according to the instructions for [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest). (The "mv2"/Manivest v2 version will also work for Chrome [through 2022](https://developer.chrome.com/docs/extensions/mv3/mv2-sunset/).)
 
 ### PICO-8 development
 
@@ -121,6 +123,10 @@ Known not to work with the Xbox Wireless Controller with Bluetooth (model 1708) 
 The DualShock 4 (model CUH-ZCT2) does work correctly in Firefox, Chrome, and Safari for macOS.
 
 The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for macOS. It does not work in XInput mode. Note that in DirectInput mode, the triggers act as digital buttons (reporting either min or max values) and the guide button is inaccessible. Additionally, the analog/digital mode switch on the front should be set to analog (light off).
+
+#### web extension
+
+Supports Chrome and Firefox. Not available from their addon sites yet, and not functional on Safari yet due to [Safari's weird packaging requirements](https://developer.apple.com/documentation/safariservices/safari_web_extensions/running_your_safari_web_extension). Restricted to the Lexaloffle BBS. Otherwise identical to the version of Pinput for exported web cartridges.
 
 ## Future goals
 

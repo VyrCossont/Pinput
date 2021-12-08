@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Pinput",
+  "version": "0.1.2",
+
+  "author": "Vyr Cossont",
+  "homepage_url": "https://github.com/VyrCossont/Pinput",
+  "description": "Enables Pinput extended gamepad support for PICO-8 cartridges on the Lexaloffle BBS.",
+
+  "icons": {
+    "16": "logo-16.png",
+    "32": "logo-32.png",
+    "48": "logo-48.png",
+    "96": "logo-96.png",
+    "128": "logo-128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.lexaloffle.com/*"],
+      "js": ["pinput-extension.js"]
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "matches": ["*://*.lexaloffle.com/*"],
+      "resources": ["pinput-extension.js"]
+    }
+  ]
+}
