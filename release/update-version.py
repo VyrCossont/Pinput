@@ -80,6 +80,19 @@ def main():
         f.write(contents)
         f.truncate()
 
+    with open(base_dir / 'web/extension/manifest.json', 'r+') as f:
+        contents = f.read()
+        contents = re.sub(
+            r'^(\s*"version": ")(\d+\.\d+\.\d+)(",)$',
+            fr'\g<1>{vformat(next_version)}\g<3>',
+            contents,
+            count=1,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        f.seek(0)
+        f.write(contents)
+        f.truncate()
+
     with open(base_dir / 'Windows/PinputCli/PinputCli.rc', 'r+') as f:
         contents = f.read()
         contents = re.sub(
