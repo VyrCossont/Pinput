@@ -449,7 +449,7 @@ function spawn_init()
  -- used by brightline
  spawn_x, spawn_y = 16, 0
  -- _update60 calls until spawn cursor advances
- spawn_interval = 180
+ spawn_interval = 60
  -- calls remaining until spawn cursor advances
  spawn_counter = 0
 end
