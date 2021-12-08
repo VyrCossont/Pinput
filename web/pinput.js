@@ -82,19 +82,31 @@ const rumbleMappings = new Map();
 rumbleMappings.set(0, [loFreqRumbleOffset, 'weakMagnitude']);
 rumbleMappings.set(1, [hiFreqRumbleOffset, 'strongMagnitude']);
 
-/** Called every animation frame to push gamepad inputs into PICO-8's GPIO area. */ 
-function loop() {
+/** Called by `loop` to push gamepad inputs into PICO-8's GPIO area. */
+function sync() {
+    let gpio;
+    if (typeof window.wrappedJSObject !== undefined) {
+        // We're in a Firefox extension content script:
+        // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
+        gpio = window.wrappedJSObject.pico8_gpio;
+    } else {
+        gpio = window.pico8_gpio;
+    }
+    if (typeof gpio === undefined) {
+        throw "pico8_gpio is not defined yet!";
+    }
+
     // Check for the magic that indicates that we should initialize Pinput.
     let shouldReinit = true;
     for (const [i, byte] of magic.entries()) {
-        if (pico8_gpio[i] !== byte) {
+        if (gpio[i] !== byte) {
             shouldReinit = false;
             break;
         }
     }
     if (shouldReinit) {
         // Zero the GPIO area.
-        pico8_gpio.fill(0);
+        gpio.fill(0);
     }
 
     // Write each supported gamepad's current state into GPIO.
@@ -103,7 +115,7 @@ function loop() {
         const gamepadBase = gamepadIndex * gamepadStride;
         if (gamepad === null || gamepad.mapping !== 'standard' || !gamepad.connected) {
             // This is a disconnected or unsupported gamepad: zero it and go to the next one.
-            pico8_gpio.fill(0, gamepadBase, gamepadBase + gamepadStride);
+            gpio.fill(0, gamepadBase, gamepadBase + gamepadStride);
             continue;
         }
 
@@ -134,7 +146,7 @@ function loop() {
         if (hasSupportedGamepadHapticActuators || hasSupportedVibrationActuator) {
             flags |= hasRumble;
         }
-        pico8_gpio[gamepadBase] = flags;
+        gpio[gamepadBase] = flags;
 
         // Handle low byte of buttons.
         let buttonsLo = 0;
@@ -162,7 +174,7 @@ function loop() {
         if (gamepad.buttons[11].pressed) {
             buttonsLo |= rightStick;
         }
-        pico8_gpio[gamepadBase + buttonsLoOffset] = buttonsLo;
+        gpio[gamepadBase + buttonsLoOffset] = buttonsLo;
 
         // Handle high byte of buttons.
         let buttonsHi = 0;
@@ -190,28 +202,28 @@ function loop() {
         if (gamepad.buttons.length > 17 && gamepad.buttons[17].pressed) {
             buttonsHi |= misc;
         }
-        pico8_gpio[gamepadBase + buttonsHiOffset] = buttonsHi;
+        gpio[gamepadBase + buttonsHiOffset] = buttonsHi;
 
         // Map triggers.
         // Triggers are considered analog buttons, not axes.
         for (const [buttonIndex, triggerOffset] of triggerMappings) {
             const triggerValue = gamepad.buttons[buttonIndex].value * triggerMax;
-            pico8_gpio[gamepadBase + triggerOffset] = triggerValue;
+            gpio[gamepadBase + triggerOffset] = triggerValue;
         }
 
         // Map axes. Y axes have to be flipped to match XInput/Apple Game Controller conventions for up.
         for (const [axisIndex, [axisOffset, axisMultiplier]] of axisMappings) {
             const axisValue = gamepad.axes[axisIndex] * axisMultiplier * axisMax;
             const axisLo = (axisValue >>> 0) & 0xff;
-            pico8_gpio[gamepadBase + axisOffset] = axisLo;
+            gpio[gamepadBase + axisOffset] = axisLo;
             const axisHi = (axisValue >>> 8) & 0xff;
-            pico8_gpio[gamepadBase + axisOffset + 1] = axisHi;
+            gpio[gamepadBase + axisOffset + 1] = axisHi;
         }
 
         // Rumble, if this browser and gamepad support it.
         if (hasSupportedGamepadHapticActuators) {
             for (const [rumbleIndex, [rumbleOffset, _]] of rumbleMappings) {
-                const rumble = pico8_gpio[gamepadBase + rumbleOffset] / rumbleMax;
+                const rumble = gpio[gamepadBase + rumbleOffset] / rumbleMax;
                 const _ = gamepad.hapticActuators[rumbleIndex].pulse(rumble, rumbleDurationMs);
             }
         } else if (hasSupportedVibrationActuator) {
@@ -220,12 +232,20 @@ function loop() {
                 duration: rumbleDurationMs,
             }
             for (const [_, [rumbleOffset, rumbleKey]] of rumbleMappings) {
-                effect[rumbleKey] = pico8_gpio[gamepadBase + rumbleOffset] / rumbleMax;
+                effect[rumbleKey] = gpio[gamepadBase + rumbleOffset] / rumbleMax;
             }
             gamepad.vibrationActuator.playEffect('dual-rumble', effect);
         }
     }
+}
 
+/** Runs `sync` in a try-catch block and then schedules itself again. */
+function loop() {
+    try {
+        sync();
+    } catch (error) {
+        console.error(`Pinput: ${error}`);
+    }
     window.requestAnimationFrame(loop);
 }
 

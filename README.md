@@ -59,11 +59,21 @@ The Windows version should not need or ask for any permissions not normally gran
 
 ### web
 
-Include the `web/pinput.js` module in your [exported web cartridge](https://www.lexaloffle.com/dl/docs/pico-8_manual.html#Web_Applications_) somehow, and call its `.init()` method. The same client code will work with both desktop and web versions.
+Include the `web/pinput.js` module in your [exported web cartridge](https://www.lexaloffle.com/dl/docs/pico-8_manual.html#Web_Applications_) somehow, and call its `.init()` method. The same Lua client code will work with both desktop and web versions of Pinput.
 
 Want to try it right now? Connect a gamepad and [run the gamepad test cartridge in your browser](https://vyrcossont.github.io/Pinput).
 
 Alternatively, check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/docs/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
+
+### web extension
+
+Under development. Check out this repo, install [Webpack](https://webpack.js.org/), run the following command from the root of the repo:
+
+```bash
+webpack --config web/webpack.config.js
+```
+
+…and then install the local copy of the extension from the [`web/extension`](web/extension) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) (or [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest), but it probably won't work in Chrome).
 
 ### PICO-8 development
 
