@@ -85,14 +85,14 @@ rumbleMappings.set(1, [hiFreqRumbleOffset, 'strongMagnitude']);
 /** Called by `loop` to push gamepad inputs into PICO-8's GPIO area. */
 function sync() {
     let gpio;
-    if (typeof window.wrappedJSObject !== undefined) {
+    if (window.wrappedJSObject !== undefined) {
         // We're in a Firefox extension content script:
         // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
         gpio = window.wrappedJSObject.pico8_gpio;
     } else {
         gpio = window.pico8_gpio;
     }
-    if (typeof gpio === undefined) {
+    if (gpio === undefined) {
         throw "pico8_gpio is not defined yet!";
     }
 
@@ -251,5 +251,6 @@ function loop() {
 
 /** Call this to start running the update loop. */
 export function init() {
+    console.log('Pinput: initialized');
     window.requestAnimationFrame(loop);
 }
