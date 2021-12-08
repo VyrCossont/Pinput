@@ -12,10 +12,14 @@ function _init()
 end
 
 function world_init()
+ world_r = 128
  display_dead = 0
- theta = 0
- dart = nil
- darts = {}
+ ship = {
+  x = 0,
+  y = 0,
+  theta = 0,
+ }
+ bullets = {}
  fire_counter = 0
  fire_cooldown = 4
  diamonds = {}
@@ -50,8 +54,8 @@ function kill_ship()
  -- particle blast from ship
  for _ = 1, 16 do
   add(particles, {
-   x = 0,
-   y = 0,
+   x = ship.x,
+   y = ship.x,
    dx = rnd(5) - 2.5,
    dy = rnd(5) - 2.5,
    color = 10,
@@ -89,18 +93,37 @@ function _update60()
 
  local x, y
 
+ -- move the ship
  x, y = pi_stick(pi_l)
- if x != 0 and y != 0 then
-  theta = atan2(x, y)
+ if x != 0 or y != 0 then
+  ship.theta = atan2(x, y)
+  ship.x += x
+  ship.y += y
+
+  -- keep ship inside world
+  ship.x = mid(-world_r, ship.x, world_r)
+  ship.y = mid(-world_r, ship.y, world_r)
+
+  -- generate modest exhaust trail
+  if rnd() > 0.3 then
+   add(particles, {
+    x = ship.x,
+    y = ship.y,
+    dx = rnd(0.5) - 0.25,
+    dy = rnd(0.5) - 0.25,
+    color = 10,
+   })
+  end
  end
 
+ -- shoot bullets
  if fire_counter == 0 then
   x, y = pi_stick(pi_r)
   if abs(x) > 0.5
   or abs(y) > 0.5 then
-   add(darts, {
-    x = 0,
-    y = 0,
+   add(bullets, {
+    x = ship.x,
+    y = ship.y,
     dx = x * 3,
     dy = y * 3,
    })
@@ -110,14 +133,14 @@ function _update60()
   fire_counter -= 1
  end
 
- for i = #darts, 1, -1 do
-  local dart = darts[i]
-  if abs(dart.x) > 64
-  or abs(dart.y) > 64 then
-   deli(darts, i)
+ for i = #bullets, 1, -1 do
+  local bullet = bullets[i]
+  if abs(bullet.x) > world_r
+  or abs(bullet.y) > world_r then
+   deli(bullets, i)
   else
-   dart.x += dart.dx
-   dart.y += dart.dy
+   bullet.x += bullet.dx
+   bullet.y += bullet.dy
   end
  end
 
@@ -127,22 +150,28 @@ function _update60()
   -- update animation state
   diamond.throb = (diamond.throb + 0.01) % 1
 
-  -- seek screen origin (should be world origin)
-  local dist = sqrt(diamond.x * diamond.x + diamond.y * diamond.y)
+  -- seek player
+  local dist_x = diamond.x - ship.x
+  local dist_y = diamond.y - ship.y
+  local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
   if dist > 0 then
-   diamond.x -= sgn(diamond.x) * 0.1
-   diamond.y -= sgn(diamond.y) * 0.1
+   -- todo: don't let them move faster diagonally, do it right
+   diamond.x -= sgn(dist_x) * 0.1
+   diamond.y -= sgn(dist_y) * 0.1
   end
+  -- keep diamond inside world
+  diamond.x = mid(-world_r, diamond.x, world_r)
+  diamond.y = mid(-world_r, diamond.y, world_r)
 
-  -- kill ship
-  if abs(diamond.x) < 2 and abs(diamond.y) < 2 then
+  -- kill ship on contact
+  if abs(dist_x) < 2 and abs(dist_y) < 2 then
    kill_ship()
   end
 
-  -- die if close enough to a dart
-  for dart in all(darts) do
-   if abs(diamond.x - dart.x) < 2
-   and abs(diamond.y - dart.y) < 2 then
+  -- die if close enough to a bullet
+  for bullet in all(bullets) do
+   if abs(diamond.x - bullet.x) < 4
+   and abs(diamond.y - bullet.y) < 4 then
     deli(diamonds, i)
     -- particle blast
     for _ = 1, 8 do
@@ -173,16 +202,19 @@ function _draw()
   return
  end
 
- -- set the origin of world space to the middle of the screen
- camera(-64, -64)
+ -- let the camera follow the player with a little parallax
+ camera(-64 + (ship.x * 0.8), -64 + (ship.y * 0.8))
 
  -- draw basic grid
- for x = -64, 63, 8 do
-  line(x, -64, x, 63, 1)
+ for x = -world_r, world_r - 1, 16 do
+  line(x, -world_r, x, world_r - 1, 1)
  end
- for y = -64, 63, 8 do
-  line(-64, y, 63, y, 1)
+ for y = -world_r, world_r - 1, 16 do
+  line(-world_r, y, world_r - 1, y, 1)
  end
+
+ -- draw edge of world
+ rect(-world_r, -world_r, world_r - 1, world_r - 1, 6)
 
  -- draw the particles as streaks
  for particle in all(particles) do
@@ -210,12 +242,12 @@ function _draw()
  -- use video memory as sprite sheet
  poke(0x5f54, 0x60)
 
- for dart in all(darts) do
-  local dart_theta = atan2(dart.dx, dart.dy)
-  vspr(shape_dart, dart.x, dart.y, 1, 1, dart_theta)
+ for bullet in all(bullets) do
+  local bullet_theta = atan2(bullet.dx, bullet.dy)
+  vspr(shape_bullet, bullet.x, bullet.y, 1, 1, bullet_theta)
  end
  
- vspr(shape_claw, 0, 0, 1.5, 1.5, theta)
+ vspr(shape_claw, ship.x, ship.y, 1.5, 1.5, ship.theta)
 
  pal()
  for diamond in all(diamonds) do
@@ -314,7 +346,7 @@ shape_claw = {
  },
 }
 
-shape_dart = {
+shape_bullet = {
  {
   color = 7,
   mirror_h = false,
@@ -430,6 +462,13 @@ function spawn_update60()
 
  -- execute the current tile
  local sprite_num = mget(spawn_x, spawn_y)
+ -- end-of-data marker
+ if sprite_num == 17 then
+  spawn_x = 16
+  spawn_y = 0
+  return
+ end
+
  -- sprite sheet pixel coordinates
  local sprite_x = (sprite_num % 16) * 8
  local sprite_y = (sprite_num \ 16) * 8
@@ -437,16 +476,20 @@ function spawn_update60()
  for sdx = 0, 7 do
   for sdy = 0, 7 do
    local c = sget(sprite_x + sdx, sprite_y + sdy)
-   -- screen = world for now
    local world_x = (sdx * 127) / 7 - 64
    local world_y = (sdy * 127) / 7 - 64
+   -- spawn around player
+   world_x += ship.x
+   world_y += ship.y
+   -- stay inside the world
+   world_x = mid(-world_r, world_x, world_r)
+   world_y = mid(-world_r, world_y, world_r)
    if c == 12 then
     add(diamonds, {
      x = world_x,
      y = world_y,
      throb = 0,
     })
-    pal(8, 13)
    end
   end
  end
@@ -486,8 +529,11 @@ pi_r = 2
 function pi_stick(s, pl)
  pl = pl or 0
  local x = pi_axis(s, pl) >> 15
- local y = pi_axis(s + 1, pl) >> 15
- return x, ~y
+ local y = ~(pi_axis(s + 1, pl) >> 15)
+ if abs(x ^ 2 + y ^ 2) < 0.1 then
+  return 0, 0
+ end
+ return x, y
 end
 
 __gfx__
@@ -500,13 +546,13 @@ __gfx__
 000000000f0f0f0f000c0000000000000c0000c00c0000c000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f0f0f0f000000000c000000cc000000c00cccc0000000000000000000000000000000000000000000000000000000000000000000000000000000000
 07777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07077070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07077070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00777700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-70777707000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-70000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07077070000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07077070000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00777700000f00f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0070070000f000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+707777070ffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0700007000f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+70000007000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __label__
 11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
 10000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000
@@ -638,7 +684,7 @@ __label__
 10000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000
 
 __map__
-0101010101010101010101010101010100020003000200030004000000050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0101010101010101010101010101010100020003000200030004000000050000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
