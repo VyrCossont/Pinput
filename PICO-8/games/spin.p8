@@ -7,13 +7,19 @@ __lua__
 function _init()
  pi_init()
  brightline_init()
+ restart_init()
+end
+
+function restart_init()
  world_init()
+ enemy_init()
  spawn_init()
 end
 
 function world_init()
  world_r = 128
  display_dead = 0
+ particles = {}
  ship = {
   x = 0,
   y = 0,
@@ -22,17 +28,6 @@ function world_init()
  bullets = {}
  fire_counter = 0
  fire_cooldown = 4
- diamonds = {
-  -- color of sparks when one dies
-  death_color = 12,
-  -- collision radius with bullets
-  bullet_r = 2,
-  -- collision radius with ship
-  ship_r = 4,
-  -- speed towards player
-  seek_speed = 0.1,
- }
- particles = {}
 end
 
 function brightline_init()
@@ -57,8 +52,7 @@ end
 
 function kill_ship()
  -- restart game
- world_init()
- spawn_init()
+ restart_init()
 
  -- particle blast from ship
  for _ = 1, 16 do
@@ -154,74 +148,48 @@ function _update60()
  end
 
  for i = #diamonds, 1, -1 do
-  -- fixme: occasional modification-while-traversal issue here
   local diamond = diamonds[i]
 
-  -- update animation state
-  diamond.throb = (diamond.throb + 0.01) % 1
-
+  update_throb(diamonds, diamond)
   seek_player(diamonds, diamond)
   clamp_to_world(diamond)
-  check_ship_collision(diamonds, diamond)
+  local ship_dead = check_ship_collision(diamonds, diamond)
+  if ship_dead then
+   return
+  end
   check_bullet_collision(diamonds, diamond, i)
  end
 
+ for i = #splitters, 1, -1 do
+  local splitter = splitters[i]
+
+  update_throb(splitters, splitter)
+  seek_player(splitters, splitter)
+  clamp_to_world(splitter)
+  local ship_dead = check_ship_collision(splitters, splitter)
+  if ship_dead then
+   return
+  end
+  local dead = check_bullet_collision(splitters, splitter, i)
+  if dead then
+   splitter_split(splitter)
+  end
+ end
+
+ for i = #splitter_frags, 1, -1 do
+  local splitter_frag = splitter_frags[i]
+
+  update_throb(splitter_frags, splitter_frag)
+  splitter_frag_orbit(splitter_frag)
+  clamp_to_world(splitter_frag)
+  local ship_dead = check_ship_collision(splitter_frags, splitter_frag)
+  if ship_dead then
+   return
+  end
+  check_bullet_collision(splitter_frags, splitter_frag, i)
+ end
+
  spawn_update60()
-end
-
-function seek_player(enemies, enemy)
- local dist_x = enemy.x - ship.x
- local dist_y = enemy.y - ship.y
- local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
- if dist > 0 then
-  -- todo: don't let them move faster diagonally, do it right
-  enemy.x -= sgn(dist_x) * enemies.seek_speed
-  enemy.y -= sgn(dist_y) * enemies.seek_speed
- end
-end
-
--- stay inside world
-function clamp_to_world(enemy)
-  enemy.x = mid(-world_r, enemy.x, world_r)
-  enemy.y = mid(-world_r, enemy.y, world_r)
-end
-
--- kill ship on contact
-function check_ship_collision(enemies, enemy)
- local dist_x = enemy.x - ship.x
- local dist_y = enemy.y - ship.y
- if abs(dist_x) < enemies.ship_r and abs(dist_y) < enemies.ship_r then
-   kill_ship()
-  end
-end
-
--- die if close enough to a bullet
-function check_bullet_collision(enemies, enemy, i)
- for b = #bullets, 1, -1 do
-  local bullet = bullets[b]
-  if abs(enemy.x - bullet.x) < enemies.bullet_r
-  and abs(enemy.y - bullet.y) < enemies.bullet_r then
-   deli(bullets, b)
-   deli(enemies, i)
-   -- particle blast
-   for _ = 1, 8 do
-    add(particles, {
-     x = enemy.x,
-     y = enemy.y,
-     dx = rnd(5) - 2.5,
-     dy = rnd(5) - 2.5,
-     color = enemies.death_color,
-    })
-   end
-   -- decrement wave counter
-   waves[enemy.wave] -= 1
-   if waves[enemy.wave] == 0 then
-    waves[enemy.wave] = nil
-    spawn_counter = 0
-   end
-   break
-  end
- end
 end
 
 function _draw()
@@ -282,13 +250,30 @@ function _draw()
  
  vspr(shape_claw, ship.x, ship.y, 1.5, 1.5, ship.theta)
 
- pal()
  for diamond in all(diamonds) do
   vspr(
    shape_diamond,
    diamond.x, diamond.y,
    3 + cos(diamond.throb), 3 + sin(diamond.throb),
    0
+  )
+ end
+
+ for splitter in all(splitters) do
+  vspr(
+   shape_splitter,
+   splitter.x, splitter.y,
+   3, 3,
+   splitter.throb
+  )
+ end
+
+ for splitter_frag in all(splitter_frags) do
+  vspr(
+   shape_splitter,
+   splitter_frag.x, splitter_frag.y,
+   1.5, 1.5,
+   splitter_frag.throb
   )
  end
 
@@ -514,12 +499,16 @@ function spawn_update60()
    local c = sget(sprite_x + sdx, sprite_y + sdy)
    local world_x = (sdx * 127) / 7 - 64
    local world_y = (sdy * 127) / 7 - 64
+
    -- spawn around player
    world_x += ship.x
    world_y += ship.y
+
    -- stay inside the world
    world_x = mid(-world_r, world_x, world_r)
    world_y = mid(-world_r, world_y, world_r)
+
+   -- switch on pixel color
    if c == 12 then
     add(diamonds, {
      wave = sprite_num,
@@ -527,12 +516,20 @@ function spawn_update60()
      y = world_y,
      throb = 0,
     })
-    -- increment wave counter
+   elseif c == 14 then
+    add(splitters, {
+     wave = sprite_num,
+     x = world_x,
+     y = world_y,
+     throb = 0,
+    })
+   end
+
+   -- increment wave counter
     if waves[sprite_num] == nil then
      waves[sprite_num] = 0
     end
     waves[sprite_num] += 1
-   end
   end
  end
 
@@ -559,6 +556,141 @@ function spawn_update60()
 end
 
 -->8
+-- enemy AI
+
+-- init tables of enemy class properties,
+-- which double as enemy lists
+function enemy_init()
+ diamonds = {
+  -- color of sparks when one dies
+  death_color = 12,
+  -- collision radius with bullets
+  bullet_r = 2,
+  -- collision radius with ship
+  ship_r = 4,
+  -- speed towards player
+  seek_speed = 0.1,
+  -- per-frame increment for throb
+  dthrob = 0.01,
+ }
+
+ splitters = {
+  death_color = 14,
+  bullet_r = 2,
+  ship_r = 4,
+  seek_speed = 0.2,
+  dthrob = 0.01,
+ }
+
+ splitter_frags = {
+  death_color = 14,
+  bullet_r = 1,
+  ship_r = 2,
+  -- no seek speed: splitter frags don't seek
+  orbit_r = 15,
+  -- splitter frag throb is actually orbit speed
+  dthrob = 0.02,
+ }
+end
+
+-- update animation state
+function update_throb(enemies, enemy)
+ enemy.throb = (enemy.throb + enemies.dthrob) % 1
+end
+
+function seek_player(enemies, enemy)
+ local dist_x = enemy.x - ship.x
+ local dist_y = enemy.y - ship.y
+ local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
+ if dist > 0 then
+  -- todo: don't let them move faster diagonally, do it right
+  enemy.x -= sgn(dist_x) * enemies.seek_speed
+  enemy.y -= sgn(dist_y) * enemies.seek_speed
+ end
+end
+
+-- stay inside world
+function clamp_to_world(enemy)
+  enemy.x = mid(-world_r, enemy.x, world_r)
+  enemy.y = mid(-world_r, enemy.y, world_r)
+end
+
+-- kill ship on contact
+-- return whether ship was hit
+function check_ship_collision(enemies, enemy)
+ local dist_x = enemy.x - ship.x
+ local dist_y = enemy.y - ship.y
+ if abs(dist_x) < enemies.ship_r
+ and abs(dist_y) < enemies.ship_r then
+  kill_ship()
+  return true
+ end
+ return false
+end
+
+-- die if close enough to a bullet
+-- return whether enemy was hit
+function check_bullet_collision(enemies, enemy, i)
+ for b = #bullets, 1, -1 do
+  local bullet = bullets[b]
+  if abs(enemy.x - bullet.x) < enemies.bullet_r
+  and abs(enemy.y - bullet.y) < enemies.bullet_r then
+   deli(bullets, b)
+   deli(enemies, i)
+
+   -- particle blast
+   for _ = 1, 8 do
+    add(particles, {
+     x = enemy.x,
+     y = enemy.y,
+     dx = rnd(5) - 2.5,
+     dy = rnd(5) - 2.5,
+     color = enemies.death_color,
+    })
+   end
+
+   -- decrement wave counter
+   waves[enemy.wave] -= 1
+   if waves[enemy.wave] == 0 then
+    waves[enemy.wave] = nil
+    spawn_counter = 0
+   end
+
+   return true
+  end
+ end
+ return false
+end
+
+-- break into three chunks on death
+function splitter_split(splitter)
+ for i = 1, 3 do
+  local theta = (i - 1) / 3
+  add(splitter_frags, {
+   wave = splitter.wave,
+   origin_x = splitter.x,
+   origin_y = splitter.y,
+   x = splitter.x + cos(theta) * splitter_frags.orbit_r,
+   y = splitter.y + sin(theta) * splitter_frags.orbit_r,
+   throb = theta,
+  })
+ end
+ -- increment wave counter
+ if waves[splitter.wave] == nil then
+  waves[splitter.wave] = 0
+ end
+ waves[splitter.wave] += 3
+end
+
+-- orbit around origin point
+function splitter_frag_orbit(splitter_frag)
+ splitter_frag.x = splitter_frag.origin_x
+  + cos(splitter_frag.throb) * splitter_frags.orbit_r
+ splitter_frag.y = splitter_frag.origin_y
+  + sin(splitter_frag.throb) * splitter_frags.orbit_r
+end
+
+-->8
 -- pinput
 #include pinput.lua
 
@@ -579,14 +711,14 @@ function pi_stick(s, pl)
 end
 
 __gfx__
-000000000f0f0f0f00000000c000000cc000000c00cccc0000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000f0f0f0f00000000c000000cc000000c00cccc00e000000e000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f0f0f0f00000c000000000000c0000c00c0000c000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000f0f0f0f000000000000000000000000c000000c00000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f0f0f0f00c0000000000000000000000c000000c00000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000f0f0f0f000000c00000000000000000c000000c00000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f0f0f0f0000000000000000000000000c000000c00000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000f0f0f0f000c0000000000000c0000c00c0000c000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000f0f0f0f000000000c000000cc000000c00cccc0000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000f0f0f0f000000000c000000cc000000c00cccc00e000000e000000000000000000000000000000000000000000000000000000000000000000000000
 07777770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 07077070000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 07077070000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -726,7 +858,7 @@ __label__
 10000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000
 
 __map__
-0101010101010101010101010101010100020003000200030004000000050000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0101010101010101010101010101010100020003000200060004000600050000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
