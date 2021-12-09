@@ -22,7 +22,16 @@ function world_init()
  bullets = {}
  fire_counter = 0
  fire_cooldown = 4
- diamonds = {}
+ diamonds = {
+  -- color of sparks when one dies
+  death_color = 12,
+  -- collision radius with bullets
+  bullet_r = 2,
+  -- collision radius with ship
+  ship_r = 4,
+  -- speed towards player
+  seek_speed = 0.1,
+ }
  particles = {}
 end
 
@@ -91,14 +100,12 @@ function _update60()
   return
  end
 
- local x, y
-
  -- move the ship
- x, y = pi_stick(pi_l)
- if x != 0 or y != 0 then
-  ship.theta = atan2(x, y)
-  ship.x += x
-  ship.y += y
+ local lx, ly = pi_stick(pi_l)
+ if lx != 0 or ly != 0 then
+  ship.theta = atan2(lx, ly)
+  ship.x += lx
+  ship.y += ly
 
   -- keep ship inside world
   ship.x = mid(-world_r, ship.x, world_r)
@@ -118,14 +125,14 @@ function _update60()
 
  -- shoot bullets
  if fire_counter == 0 then
-  x, y = pi_stick(pi_r)
-  if abs(x) > 0.5
-  or abs(y) > 0.5 then
+  local rx, ry = pi_stick(pi_r)
+  if abs(rx) > 0.5
+  or abs(ry) > 0.5 then
    add(bullets, {
     x = ship.x,
     y = ship.y,
-    dx = x * 3,
-    dy = y * 3,
+    dx = rx * 3 + lx,
+    dy = ry * 3 + ly,
    })
    fire_counter = fire_cooldown
   end
@@ -133,8 +140,10 @@ function _update60()
   fire_counter -= 1
  end
 
+ -- move bullets
  for i = #bullets, 1, -1 do
   local bullet = bullets[i]
+  -- vanish when edge is hit
   if abs(bullet.x) > world_r
   or abs(bullet.y) > world_r then
    deli(bullets, i)
@@ -145,50 +154,74 @@ function _update60()
  end
 
  for i = #diamonds, 1, -1 do
+  -- fixme: occasional modification-while-traversal issue here
   local diamond = diamonds[i]
 
   -- update animation state
   diamond.throb = (diamond.throb + 0.01) % 1
 
-  -- seek player
-  local dist_x = diamond.x - ship.x
-  local dist_y = diamond.y - ship.y
-  local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
-  if dist > 0 then
-   -- todo: don't let them move faster diagonally, do it right
-   diamond.x -= sgn(dist_x) * 0.1
-   diamond.y -= sgn(dist_y) * 0.1
-  end
-  -- keep diamond inside world
-  diamond.x = mid(-world_r, diamond.x, world_r)
-  diamond.y = mid(-world_r, diamond.y, world_r)
-
-  -- kill ship on contact
-  if abs(dist_x) < 2 and abs(dist_y) < 2 then
-   kill_ship()
-  end
-
-  -- die if close enough to a bullet
-  for bullet in all(bullets) do
-   if abs(diamond.x - bullet.x) < 4
-   and abs(diamond.y - bullet.y) < 4 then
-    deli(diamonds, i)
-    -- particle blast
-    for _ = 1, 8 do
-     add(particles, {
-      x = diamond.x,
-      y = diamond.y,
-      dx = rnd(5) - 2.5,
-      dy = rnd(5) - 2.5,
-      color = 12,
-     })
-    end
-    break
-   end
-  end
+  seek_player(diamonds, diamond)
+  clamp_to_world(diamond)
+  check_ship_collision(diamonds, diamond)
+  check_bullet_collision(diamonds, diamond, i)
  end
 
  spawn_update60()
+end
+
+function seek_player(enemies, enemy)
+ local dist_x = enemy.x - ship.x
+ local dist_y = enemy.y - ship.y
+ local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
+ if dist > 0 then
+  -- todo: don't let them move faster diagonally, do it right
+  enemy.x -= sgn(dist_x) * enemies.seek_speed
+  enemy.y -= sgn(dist_y) * enemies.seek_speed
+ end
+end
+
+-- stay inside world
+function clamp_to_world(enemy)
+  enemy.x = mid(-world_r, enemy.x, world_r)
+  enemy.y = mid(-world_r, enemy.y, world_r)
+end
+
+-- kill ship on contact
+function check_ship_collision(enemies, enemy)
+ local dist_x = enemy.x - ship.x
+ local dist_y = enemy.y - ship.y
+ if abs(dist_x) < enemies.ship_r and abs(dist_y) < enemies.ship_r then
+   kill_ship()
+  end
+end
+
+-- die if close enough to a bullet
+function check_bullet_collision(enemies, enemy, i)
+ for b = #bullets, 1, -1 do
+  local bullet = bullets[b]
+  if abs(enemy.x - bullet.x) < enemies.bullet_r
+  and abs(enemy.y - bullet.y) < enemies.bullet_r then
+   deli(bullets, b)
+   deli(enemies, i)
+   -- particle blast
+   for _ = 1, 8 do
+    add(particles, {
+     x = enemy.x,
+     y = enemy.y,
+     dx = rnd(5) - 2.5,
+     dy = rnd(5) - 2.5,
+     color = enemies.death_color,
+    })
+   end
+   -- decrement wave counter
+   waves[enemy.wave] -= 1
+   if waves[enemy.wave] == 0 then
+    waves[enemy.wave] = nil
+    spawn_counter = 0
+   end
+   break
+  end
+ end
 end
 
 function _draw()
@@ -452,6 +485,9 @@ function spawn_init()
  spawn_interval = 60
  -- calls remaining until spawn cursor advances
  spawn_counter = 0
+ -- enemies spawn in waves
+ -- map of sprite_num to count remaining from that wave
+ waves = {}
 end
 
 function spawn_update60()
@@ -486,10 +522,16 @@ function spawn_update60()
    world_y = mid(-world_r, world_y, world_r)
    if c == 12 then
     add(diamonds, {
+     wave = sprite_num,
      x = world_x,
      y = world_y,
      throb = 0,
     })
+    -- increment wave counter
+    if waves[sprite_num] == nil then
+     waves[sprite_num] = 0
+    end
+    waves[sprite_num] += 1
    end
   end
  end
