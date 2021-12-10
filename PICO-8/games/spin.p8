@@ -11,6 +11,7 @@ function _init()
 end
 
 function restart_init()
+ record_init()
  world_init()
  enemy_init()
  spawn_init()
@@ -70,9 +71,20 @@ function kill_ship()
 end
 
 function _update60()
- if not pi_is_inited() or not pi_flag(pi_connected) then
+ -- if we have no inputs, give up
+ if record_replay == nil
+ and (not pi_is_inited() or not pi_flag(pi_connected)) then
   return
  end
+
+ -- advance replay, if there is one
+ record_playback_advance()
+
+ -- read sticks here for recording purposes
+ -- also used for actual input below
+ local lx, ly = pi_stick(pi_l)
+ local rx, ry = pi_stick(pi_r)
+ record_frame_inputs(lx, ly, rx, ry)
 
  -- update particles
  -- do this even if we're dead
@@ -95,7 +107,6 @@ function _update60()
  end
 
  -- move the ship
- local lx, ly = pi_stick(pi_l)
  if lx != 0 or ly != 0 then
   ship.theta = atan2(lx, ly)
   ship.x += lx
@@ -119,7 +130,6 @@ function _update60()
 
  -- shoot bullets
  if fire_counter == 0 then
-  local rx, ry = pi_stick(pi_r)
   if abs(rx) > 0.5
   or abs(ry) > 0.5 then
    add(bullets, {
@@ -195,10 +205,10 @@ end
 function _draw()
  cls()
 
- if not pi_is_inited() then
+ if record_replay == nil and not pi_is_inited() then
   ?"waiting for pinput connection..."
   return
- elseif not pi_flag(pi_connected) then
+ elseif record_replay == nil and not pi_flag(pi_connected) then
   ?"player #1, connect your gamepad..."
   return
  end
@@ -691,7 +701,7 @@ function splitter_frag_orbit(splitter_frag)
 end
 
 -->8
--- pinput
+-- input
 #include pinput.lua
 
 -- sticks
@@ -708,6 +718,146 @@ function pi_stick(s, pl)
   return 0, 0
  end
  return x, y
+end
+
+-->8
+-- input recording/playback
+
+-- implement printf %0nd
+function lzpad(s, n)
+ s = tostr(s)
+ while #s < n do
+  s = "0" .. s
+ end
+ return s
+end
+
+-- set to true to create recordings of every game
+record_enabled = false
+
+-- stored where record_init() won't wipe it at startup
+record_filename = nil
+
+-- replay data is checked for in a few places.
+-- if nil, the game should work normally,
+-- but if not present, _update60() will break.
+record_replay = nil
+
+-- uncomment to load replay data
+-- /!\ replays that are too long will exhaust the token limit
+-- #include spin_replay.lua
+
+-- if current replay frame is not in future,
+-- advance, keeping track of state changes, until it is.
+function record_playback_advance()
+ if record_replay == nil then
+  return
+ end
+
+ local effective_t = time() - record_base_t
+ while record_playback_index <= #record_replay
+ and record_replay[record_playback_index].t <= effective_t do
+  local frame = record_replay[record_playback_index]
+  for k, v in pairs(frame) do
+   if k != "t" then
+    record_playback_state[k] = v
+   end
+  end
+  record_playback_index += 1
+ end
+end
+
+function record_playback_pi_stick(s)
+ if s == pi_l then
+  return record_playback_state.lx, record_playback_state.ly
+ elseif s == pi_r then
+  return record_playback_state.rx, record_playback_state.ry
+ end
+end
+
+-- if a replay is loaded, redefine input system
+if record_replay != nil then
+ pi_stick = record_playback_pi_stick
+end
+
+-- setup for recording or playing back inputs
+function record_init()
+ -- record and playback times are relative to start of recording
+ record_base_t = time()
+
+ -- current playback state and frame
+ record_playback_state = {
+  lx = 0,
+  ly = 0,
+  rx = 0,
+  ry = 0,
+ }
+ record_playback_index = 1
+
+ -- don't set up for recording if disabled or a replay is loaded
+ if not record_enabled or record_replay != nil then
+  return
+ end
+
+ -- end previous recording
+ if record_filename != nil then
+  record_printh("}")
+ end
+
+ -- start new recording file with name from current UTC date
+ record_filename = "spin_replay_" .. lzpad(stat(80), 4)
+ -- /!\ you can't use dashes in printh() filenames. go figure.
+ for s = 81, 85 do
+  record_filename ..= "_" .. lzpad(stat(s), 2)
+ end
+ record_filename ..= "_z.txt"
+
+ -- initial input states assumed to be zero
+ record_prev_lx = 0
+ record_prev_ly = 0
+ record_prev_rx = 0
+ record_prev_ry = 0
+ record_printh("record_replay = {")
+end
+
+-- record by appending to file on desktop
+function record_printh(s)
+ printh(s, record_filename, false, true)
+end
+
+-- if inputs change, record time and any changed inputs
+function record_frame_inputs(lx, ly, rx, ry)
+ -- don't record if disabled or a replay is loaded
+ if not record_enabled or record_replay != nil then
+  return
+ end
+
+ if lx == record_prev_lx
+ and ly == record_prev_ly
+ and rx == record_prev_rx
+ and ry == record_prev_ry then
+  return
+ end
+ record_printh(" {")
+ -- time relative to start of recording
+ record_printh("  t = " .. tostr(time() - record_base_t, 1) .. ",")
+ if lx != record_prev_lx then
+  record_printh("  lx = " .. tostr(lx, 1) .. ",")
+  record_prev_lx = lx
+ end
+ if ly != record_prev_ly then
+  record_printh("  ly = " .. tostr(ly, 1) .. ",")
+  record_prev_ly = ly
+ end
+ if rx != record_prev_rx then
+  record_printh("  rx = " .. tostr(rx, 1) .. ",")
+  record_prev_rx = rx
+ end
+ if ry != record_prev_ry then
+  record_printh("  ry = " .. tostr(ry, 1) .. ",")
+  record_prev_ry = ry
+ end
+ record_printh(" },")
 end
 
 __gfx__
