@@ -28,7 +28,7 @@ end
 -- if magic is cleared,
 -- pinput is ready
 function pi_is_inited()
- return $pi_gpio != pi_magic[1]
+ return peek4(pi_gpio) ~= pi_magic[1]
 end
 
 -- buttons
@@ -68,7 +68,7 @@ function pi_btn(b, pl)
   assert(false, 'pi_btn: parameter out of range')
  end
  
- local buttons = %(pi_gpio
+ local buttons = peek2(pi_gpio
   + pl * pi_gamepad_stride
   + pi_buttons_offset)
  return 1 & (buttons >> b) == 1
@@ -92,7 +92,7 @@ function pi_trigger(t, pl)
   assert(false, 'pi_trigger: parameter out of range')
  end
  
- return @(pi_gpio
+ return peek(pi_gpio
   + pl * pi_gamepad_stride
   + pi_trigger_offset
   + t * pi_trigger_stride)
@@ -117,7 +117,7 @@ function pi_axis(a, pl)
   assert(false, 'pi_axis: parameter out of range')
  end
  
- return %(pi_gpio
+ return peek2(pi_gpio
   + pl * pi_gamepad_stride
   + pi_axis_offset
   + a * pi_axis_stride)
@@ -139,7 +139,7 @@ function pi_rumble(r, v, pl)
  if pl < 0 or pl >= pi_num_players
  or r < 0 or r >= pi_num_rumbles
  or v < 0x00 or v > 0xff
- or v % 1 != 0 then
+ or v % 1 ~= 0 then
   assert(false, 'pi_rumble: parameter out of range')
  end
 
@@ -151,9 +151,7 @@ function pi_rumble(r, v, pl)
  )
 end
 
--- todo:
-
--- buttons
+-- flags
 
 pi_flags_offset = 0
 pi_num_flags = 6
@@ -173,7 +171,7 @@ function pi_flag(f, pl)
   assert(false, 'pi_flag: parameter out of range')
  end
 
- local buttons = @(pi_gpio
+ local buttons = peek2(pi_gpio
   + pl * pi_gamepad_stride
   + pi_flags_offset)
  return 1 & (buttons >> f) == 1
@@ -191,7 +189,7 @@ function pi_battery(pl)
   assert(false, 'pi_battery: parameter out of range')
  end
 
- return @(pi_gpio
+ return peek(pi_gpio
   + pl * pi_gamepad_stride
   + pi_battery_offset)
 end
