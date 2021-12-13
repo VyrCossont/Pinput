@@ -6,7 +6,7 @@
 -- todo: use pack/unpack and ord/chr as necessary
 
 function format_repeat(s, n)
- local r = ""
+ local r = ''
  for _ = 1, n do
   r = r .. s
  end
@@ -16,7 +16,7 @@ end
 -- implement printf %0nd
 function format_lzpad(s, n)
  s = tostr(s)
- return format_repeat("0", n - #s) .. s
+ return format_repeat('0', n - #s) .. s
 end
 
 -- insertion sort step for any x comparable
@@ -32,15 +32,15 @@ end
 
 -- convert value to Lua literal
 function format_toliteral(x, indent)
- if type(x) == "nil" then
-  return "nil"
- elseif type(x) == "string" then
+ if type(x) == 'nil' then
+  return 'nil'
+ elseif type(x) == 'string' then
   return format_toliteral_string(x)
- elseif type(x) == "table" then
+ elseif type(x) == 'table' then
   return format_toliteral_table(x, indent)
  else
-  -- will not produce valid Lua for functions
-  return tostr(x, 1)
+  -- will not produce valid Lua for functions or coroutines
+  return tostr(x)
  end
 end
 
@@ -70,7 +70,7 @@ function format_toliteral_string(s)
    -- so we don't need to escape single quotes
    q = q .. c
   else
-   local e = format_toliteral_lua_escapes(c)
+   local e = format_toliteral_lua_escapes[c]
    if e ~= nil then
     q = q .. e
    else
@@ -78,7 +78,7 @@ function format_toliteral_string(s)
     if format_isascii(o) then
      q = q .. c
     else
-     q = q .. "\\x" .. sub(tostr(o, 1), 5, 6)
+     q = q .. '\\x' .. sub(tostr(o, 1), 5, 6)
     end
    end
   end
@@ -103,7 +103,7 @@ end
 
 -- can this string be used as a Lua ID or unquoted string key?
 function format_is_id(s)
- assert(type(s) == "string")
+ assert(type(s) == 'string')
  if #s == 0 then
   return false
  end
@@ -121,7 +121,7 @@ function format_is_id(s)
 end
 
 -- convert table to string in stable format
-function format_toliteral_table(t)
+function format_toliteral_table(t, indent)
  -- get keys from pairs and sort them within type
  -- booleans can't be compared
  local false_key = false
@@ -133,9 +133,9 @@ function format_toliteral_table(t)
    false_key = true
   elseif k == true then
    true_key = true
-  elseif type(k) == "string" then
+  elseif type(k) == 'string' then
    format_add_in_order(string_keys, k)
-  elseif type(k) == "number" then
+  elseif type(k) == 'number' then
    format_add_in_order(number_keys, k)
   else
    assert(false, "unexpected type as table key: " .. type(k))
@@ -150,41 +150,47 @@ function format_toliteral_table(t)
  if true_key then
   add(keys, true)
  end
- for k in number_keys do
+ for k in all(number_keys) do
   add(keys, k)
  end
 
- local indent_space = ""
- local indent_newline = ""
- local indent_self = ""
- local indent_items = ""
+ -- pretty-printing support
+ local indent_space = ''
+ local indent_newline = ''
+ local indent_self = ''
+ local indent_items = ''
  local recurse_indent
  if indent ~= nil then
-  indent_space = " "
-  indent_newline = "\n"
-  indent_self = format_repeat(" ", indent)
-  indent_items = format_repeat(" ", indent + 1)
-  recurse_indent = recurse_indent + 2
+  indent_space = ' '
+  indent_newline = '\n'
+  indent_self = format_repeat(' ', indent)
+  indent_items = format_repeat(' ', indent + 1)
+  recurse_indent = indent + 2
  end
 
- local s = "{" .. indent_newline
- for k in all(keys) do
+ local s = '{' .. indent_newline
+ for i, k in ipairs(keys) do
   s = s .. indent_items
-  if type(k) == number
+  if type(k) == 'number'
     and k == flr(k)
     and k >= 1
     and k <= #t
   then
    -- use implicit key numbering and don't write the key
   else
-   if type(k) == string and format_is_id(k) then
+   if type(k) == 'string' and format_is_id(k) then
     s = s .. k
    else
-    s = s .. "[" .. format_toliteral_string(k) .. "]"
+    s = s .. '[' .. format_toliteral(k) .. ']'
    end
-   s = s .. indent_space .. "=" .. indent_space
+   s = s .. indent_space .. '=' .. indent_space
   end
-  s = s .. format_toliteral(t[s], recurse_indent) .. "," .. indent_newline
+  s = s .. format_toliteral(t[k], recurse_indent)
+  if indent ~= nil or i < #t then
+   -- write a trailing comma
+   s = s .. ','
+  end
+  s = s .. indent_newline
  end
- return s .. indent_self .. "}"
+ return s .. indent_self .. '}'
 end
