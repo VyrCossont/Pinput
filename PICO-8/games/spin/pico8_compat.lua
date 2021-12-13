@@ -9,6 +9,24 @@ pack = table.pack
 -- https://www.lua.org/manual/5.4/manual.html#pdf-table.unpack
 unpack = table.unpack
 
+-- https://www.lexaloffle.com/dl/docs/pico-8_manual.html#ADD
+-- https://www.lua.org/manual/5.4/manual.html#pdf-table.insert
+add = table.insert
+
+-- https://www.lexaloffle.com/dl/docs/pico-8_manual.html#ALL
+-- https://www.lua.org/pil/7.html
+function all(tbl)
+ local i = 0
+ function iter()
+  i = i + 1
+  if i > #tbl then
+   return nil
+  end
+  return tbl[i]
+ end
+ return iter, nil, nil
+end
+
 -- https://www.lexaloffle.com/dl/docs/pico-8_manual.html#CHR
 -- https://www.lua.org/manual/5.4/manual.html#pdf-string.char
 chr = string.char

@@ -9,7 +9,25 @@ require 'pico8_compat'
 -- test cases reproduced from the PICO-8 manual
 test_pico8_compat = {}
 
-function test_pico8_compat.test_chr ()
+function test_pico8_compat.test_all()
+ local tbl = {1, 2, 3}
+ local len = 0
+ local sum = 0
+ for x in all(tbl) do
+  len = len + 1
+  sum = sum + x
+ end
+ luaunit.assertEquals(
+   len,
+   3
+ )
+ luaunit.assertEquals(
+   sum,
+   6
+ )
+end
+
+function test_pico8_compat.test_chr()
  luaunit.assertEquals(
    chr(64),
    '@'
