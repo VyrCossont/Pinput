@@ -32,7 +32,9 @@ end
 
 -- convert value to Lua literal
 function format_toliteral(x, indent)
- if type(x) == "string" then
+ if type(x) == "nil" then
+  return "nil"
+ elseif type(x) == "string" then
   return format_toliteral_string(x)
  elseif type(x) == "table" then
   return format_toliteral_table(x, indent)
