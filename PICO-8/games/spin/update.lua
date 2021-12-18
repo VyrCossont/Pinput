@@ -41,7 +41,6 @@ function update60()
 
  if display_dead > 0 then
   display_dead = display_dead - 1
-  cpu_update60 = stat(1) - cpu_base
   return
  end
 
@@ -104,7 +103,6 @@ function update60()
   clamp_to_world(diamond)
   local ship_dead = check_ship_collision(diamonds, diamond)
   if ship_dead then
-   cpu_update60 = stat(1) - cpu_base
    return
   end
   check_bullet_collision(diamonds, diamond, i)
@@ -118,7 +116,6 @@ function update60()
   clamp_to_world(splitter)
   local ship_dead = check_ship_collision(splitters, splitter)
   if ship_dead then
-   cpu_update60 = stat(1) - cpu_base
    return
   end
   local dead = check_bullet_collision(splitters, splitter, i)
@@ -135,12 +132,10 @@ function update60()
   clamp_to_world(splitter_frag)
   local ship_dead = check_ship_collision(splitter_frags, splitter_frag)
   if ship_dead then
-   cpu_update60 = stat(1) - cpu_base
    return
   end
   check_bullet_collision(splitter_frags, splitter_frag, i)
  end
 
  spawn_update60()
- cpu_update60 = stat(1) - cpu_base
 end

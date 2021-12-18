@@ -4,7 +4,7 @@ __lua__
 -- spin vector demo
 -- @vyr@demon.social
 
-#include pinput.lua
+#include ../pinput.lua
 #include spin/init.lua
 #include spin/update.lua
 #include spin/draw.lua
@@ -20,9 +20,6 @@ __lua__
 -- uncomment to load replay data
 -- /!\ replays that are too long will exhaust the token limit
 -- #include spin/replay.lua
-
-
-
 
 __gfx__
 000000000f0f0f0f00000000c000000cc000000c00cccc00e000000e000000000000000000000000000000000000000000000000000000000000000000000000
