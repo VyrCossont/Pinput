@@ -41,6 +41,14 @@ function test_pico8_compat_math.test_mid()
    mid(7, 5, 10),
    7
  )
+ luaunit.assertEquals(
+   mid(5, 7, 10),
+   5
+ )
+ luaunit.assertEquals(
+   mid(5, 10, 7),
+   7
+ )
 end
 
 function test_pico8_compat_math.test_flr()

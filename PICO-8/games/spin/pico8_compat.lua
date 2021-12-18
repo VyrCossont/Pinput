@@ -47,7 +47,7 @@ function mid(x, y, z)
  local max_xyz = math.max(x, y, z)
  if x ~= min_xyz and x ~= max_xyz then
   return x
- elseif x ~= min_xyz and x ~= max_xyz then
+ elseif y ~= min_xyz and y ~= max_xyz then
   return y
  else
   return z
