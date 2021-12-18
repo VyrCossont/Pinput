@@ -13,7 +13,7 @@ set -eu
 release_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 # Get release metadata.
-version="$(cat release/version.txt)"
+version="$(cat "${release_dir}/version.txt")"
 # Assume we're building for the current architecture and OS.
 arch="$(uname -m)"
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"

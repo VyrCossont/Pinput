@@ -8,13 +8,13 @@
 [//]: # (start ToC)
 
 * [Introduction](#introduction)
+* [PICO-8 development](#pico-8-development)
 * [Instructions](#instructions)
   * [Rust](#rust)
   * [macOS](#macos)
   * [Windows](#windows)
   * [web](#web)
     * [web extension](#web-extension)
-  * [PICO-8 development](#pico-8-development)
 * [Current status](#current-status)
   * [Rust](#rust-1)
   * [macOS](#macos-1)
@@ -34,6 +34,21 @@ Ever wish [PICO-8](https://www.lexaloffle.com/pico-8.php) had dual analog stick 
 [![The author demonstrating the web version of Pinput by moving gamepad](docs/Pinput-demo-web.jpg)](https://raw.githubusercontent.com/VyrCossont/Pinput/main/docs/Pinput-demo-web.mp4)
 
 *[(Click for video.)]((https://raw.githubusercontent.com/VyrCossont/Pinput/main/docs/Pinput-demo-web.mp4))*
+
+## PICO-8 development
+
+To add Pinput support to your own cartridge, take a look at [`pinput.lua`](PICO-8/pinput.lua). All of the functions and constants prefixed with `pi_` are the Pinput client code proper, and you can copy or `#include pinput.lua` that code right into your cartridge to use it yourself.
+
+Call `pi_init()` to put the Pinput magic bytes into GPIO so one of the helper apps can find it and start communicating, and call `pi_btn()`, `pi_trigger()`, `pi_axis()`, etc. to read button, trigger, and thumbstick axis values. Note that (as in XInput) trigger values are in the range [0, 255] and axes are in the range [-32768, 32767]. Also note that Y axes on thumbsticks are inverted, although I may change this in a future release.
+
+```lua
+-- read player 2's left trigger and scale it to [0, 1)
+local lt = pi_trigger(pi_lt, 1) >> 8
+```
+
+Consult [`pinput_tester.p8`](PICO-8/pinput_tester.p8) (the test cartridge) for more usage examples.
+
+Note that Pinput doesn't try to suppress PICO-8's own gamepad API, and whatever button PICO-8 uses to open the pause menu will still open the menu. However, you can use the undocumented [`poke(0x5f30, 1)`](https://pico-8.fandom.com/wiki/Memory#Draw_state) trick to suppress the menu yourself.
 
 ## Instructions
 
@@ -94,30 +109,7 @@ Alternatively, check this repo out, run `python3 -m http.server 8080` in the rep
 
 #### web extension
 
-The web extension lets you use Pinput with the web player on the [Lexaloffle BBS](https://www.lexaloffle.com/bbs/?cat=7).
-
-Check out this repo, install [Webpack](https://webpack.js.org/), run the following command from the root of the repo:
-
-```bash
-./release/release-web-extensions.sh
-```
-
-…and then install the local copy of the extension from the [`release/artifacts/pinput-web-extension-mv2`](release/artifacts/pinput-web-extension-mv2) folder according to the instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/), or the [`release/artifacts/pinput-web-extension-mv3`](release/artifacts/pinput-web-extension-mv3) folder according to the instructions for [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest). (The `mv2`/Manifest v2 version will also work for Chrome [through 2022](https://developer.chrome.com/docs/extensions/mv3/mv2-sunset/).)
-
-### PICO-8 development
-
-To add Pinput support to your own cartridge, take a look at [`pinput.lua`](PICO-8/pinput.lua) All of the functions and constants prefixed with `pi_` are the Pinput client code proper, and you can copy or `#include pinput.lua` that code right into your cartridge to use it yourself.
-
-Call `pi_init()` to put the Pinput magic bytes into GPIO so one of the helper apps can find it and start communicating, and call `pi_btn()`, `pi_trigger()`, `pi_axis()`, etc. to read button, trigger, and thumbstick axis values. Note that (as in XInput) trigger values are in the range [0, 255] and axes are in the range [-32768, 32767].
-
-```lua
--- read player 2's left trigger and scale it to [0, 1]
-local t = pi_trigger(1, pi_lt) / 0xff
-```
-
-Consult [`pinput_tester.p8`](PICO-8/pinput_tester.p8) (the test cartridge) for more usage examples.
-
-Note that Pinput doesn't try to suppress PICO-8's own gamepad API, and whatever button PICO-8 uses to open the pause menu will still open the menu. However, you can use the undocumented [`poke(0x5f30, 1)`](https://pico-8.fandom.com/wiki/Memory#Draw_state) trick to suppress the menu yourself.
+The web extension lets you use Pinput with the web player on the [Lexaloffle BBS](https://www.lexaloffle.com/bbs/?cat=7). You can download the web extensions for Firefox and Chrome from [this GitHub project's releases](https://github.com/VyrCossont/Pinput/releases); they're not yet on either browser's extension site. Once you've downloaded one, unzip it, and then follow the developer installation instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) or [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest).
 
 ## Current status
 
@@ -153,7 +145,7 @@ The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for m
 
 #### web extension
 
-Supports Chrome and Firefox. Not available from their addon sites yet, and not functional on Safari yet due to [Safari's weird packaging requirements](https://developer.apple.com/documentation/safariservices/safari_web_extensions/running_your_safari_web_extension). Restricted to the Lexaloffle BBS. Otherwise identical to the version of Pinput for exported web cartridges.
+Supports Chrome and Firefox. Not available from their extension sites yet ([Chrome Web Store](https://chrome.google.com/webstore/category/extensions), [Firefox Browser Add-Ons](https://addons.mozilla.org/firefox/extensions/)), and not functional on Safari yet due to [Safari's weird packaging requirements](https://developer.apple.com/documentation/safariservices/safari_web_extensions/running_your_safari_web_extension). Restricted to the Lexaloffle BBS. Otherwise identical to the version of Pinput for exported web cartridges.
 
 ## Future goals
 
