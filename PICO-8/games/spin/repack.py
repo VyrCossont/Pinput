@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 import sys
 from collections import Counter
 from functools import reduce
 from itertools import chain, groupby, islice
+from math import ceil
 import operator
 from pathlib import Path
 from statistics import quantiles, mean, median, mode
@@ -37,81 +39,80 @@ delta (i<b> where b in [1, 15]): signed value to be added to accumulator
 
 class BitVector:
     """
-    Compatible with PyPI BitVector, but backed by Python 3 int type, and several orders of magnitude faster.
-    Indexes are backwards for compatibility.
-    TODO: un-backwards everything
+    Uses little-endian representation to match PICO-8.
     """
 
     size: int
     bits: int
 
-    # noinspection PyPep8Naming
+    # noinspection PyShadowingBuiltins
     def __init__(
             self,
             size: Optional[int] = None,
-            intVal: Optional[int] = None,
-            rawbytes: Optional[bytes] = None
+            bits: Optional[int] = None,
+            bytes: Optional[bytes] = None
     ):
-        if size is not None:
-            self.size = size
-            if size == 0:
-                self.bits = 0
+        if bits is not None:
+            if size is not None:
+                self.size = size
             else:
-                assert intVal is not None
-                self.bits = intVal
+                self.size = bits.bit_length()
+            self.bits = bits
+        elif bytes is not None:
+            if size is not None:
+                self.size = size
+            else:
+                self.size = len(bytes) * 8
+            self.bits = int.from_bytes(bytes, 'little')
         else:
-            assert rawbytes is not None
-            self.size = len(rawbytes) * 8
+            assert size is not None
+            self.size = size
             self.bits = 0
-            for byte in rawbytes:
-                self.bits <<= 8
-                self.bits |= byte
 
     def __len__(self) -> int:
         return self.size
 
-    def __add__(self, other: 'BitVector') -> 'BitVector':
+    def __add__(self, other: BitVector) -> BitVector:
         return BitVector(
             size=self.size + other.size,
-            intVal=self.bits << other.size | other.bits
+            bits=self.bits | other.bits << self.size
         )
 
-    def __iadd__(self, other: 'BitVector') -> 'BitVector':
+    def __iadd__(self, other: BitVector) -> BitVector:
+        self.bits |= other.bits << self.size
         self.size += other.size
-        self.bits <<= other.size
-        self.bits |= other.bits
         return self
 
-    def __getitem__(self, item: Union[int, slice]) -> Union[int, 'BitVector']:
+    def __getitem__(self, item: Union[int, slice]) -> Union[int, BitVector]:
         if isinstance(item, int):
             if item < 0:
                 item += self.size
-            if item < 0 or item >= self.size:
-                raise IndexError
-            item = self.size - 1 - item
             return self.bits >> item & 1
         else:
             start, stop, step = item.indices(self.size)
             assert step == 1
-            bits = 0
-            for i in range(start, stop):
-                bits <<= 1
-                bits |= self.bits >> (self.size - 1 - i) & 1
-            return BitVector(size=stop - start, intVal=bits)
+            bits = self.bits >> start
+            size = stop - start
+            bits &= bit_mask(size)
+            return BitVector(size=size, bits=bits)
 
     def __int__(self) -> int:
         return self.bits
 
     def __str__(self) -> str:
         s = bin(self.bits)[2:]
-        return '0' * (self.size - len(s)) + s
+        fill = '0' * (self.size - len(s))
+        return ''.join(reversed(fill + s))
 
-    def pad_from_right(self, n: int) -> None:
-        self.size += n
-        self.bits <<= n
+    def __bytes__(self):
+        num_bytes = ceil(self.size / 8)
+        return self.bits.to_bytes(num_bytes, 'little')
 
+    def __eq__(self, other: BitVector) -> bool:
+        return self.size == other.size and self.bits == other.bits
 
-BitVector = BitVector
+    def __hash__(self) -> int:
+        return hash((self.size, self.bits))
 
 
 class Record(NamedTuple):
@@ -202,12 +203,12 @@ def bit_mask(b: int) -> int:
 
 
 def signed_bits(b: int, x: int) -> BitVector:
-    return BitVector(size=b, intVal=bit_mask(b) & x)
+    return BitVector(size=b, bits=bit_mask(b) & x)
 
 
 def unsigned_bits(b: int, x: int) -> BitVector:
     assert x >= 0
-    return BitVector(size=b, intVal=x)
+    return BitVector(size=b, bits=x)
 
 
 def concat_bits(bvs: Iterable[BitVector]) -> BitVector:
@@ -238,7 +239,7 @@ def main():
 
     # just mash all the columns together for stats
     column = list(chain.from_iterable(columns.values()))
-    column_data_bytes = bits_to_bytes(concat_bits(signed_bits(16, x) for x in column))
+    column_data_bytes = bytes(concat_bits(signed_bits(16, x) for x in column))
 
     # let's get those stats
     bit_lengths = Counter()
@@ -273,7 +274,7 @@ def main():
     compressed_data_bytes = compress(column)
     print(f'len(compressed_data_bytes): {len(compressed_data_bytes)}')
     decompressed_data_bytes = b''.join(
-        bits_to_bytes(signed_bits(16, x))
+        bytes(signed_bits(16, x))
         for x
         in decompress(compressed_data_bytes)
     )
@@ -381,12 +382,11 @@ def compress(column) -> bytes:
     print()
 
     compressed_data_bits = Literal(len(column)).bits() + concat_bits(run.bits() for run in runs)
-    compressed_data_bits.pad_from_right(-len(compressed_data_bits) % 8)
-    return bits_to_bytes(compressed_data_bits)
+    return bytes(compressed_data_bits)
 
 
 def decompress(data: bytes) -> Iterable[int]:
-    bv = BitVector(rawbytes=data)
+    bv = BitVector(bytes=data)
     samples = int(bv[:16])
     pos = 16
     count = 0
