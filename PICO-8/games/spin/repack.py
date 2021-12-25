@@ -220,6 +220,45 @@ def as_signed(bv: BitVector) -> int:
     return x - (1 << b) if x >= (1 << (b - 1)) else x
 
 
+def write_varint(x: int, group_size: int = 3) -> BitVector:
+    """
+    Write signed integer as nibbles,
+    each one consisting of a continuation flag
+    (1 for more nibbles, 0 for last),
+    followed by 3 data bits, least significant bits first.
+    """
+    groups = []
+    b = signed_bit_length(x)
+    num_groups = ceil(b / group_size)
+    for i in range(num_groups):
+        bits = x & bit_mask(group_size)
+        if i != num_groups - 1:
+            bits |= 1 << group_size
+        groups.append(BitVector(
+            size=1 + group_size,
+            bits=bits
+        ))
+        x >>= group_size
+    return concat_bits(groups)
+
+
+def read_varint(bv: BitVector, group_size: int = 3) -> (int, int):
+    """
+    Read signed integer from nibbles.
+    :return: (number of data bits used to store integer, value)
+    """
+    x = 0
+    b = 0
+    pos = 0
+    while True:
+        x |= int(bv[pos:pos+group_size]) << b
+        b += group_size
+        if bv[pos + group_size] == 0:
+            break
+        pos += 1 + group_size
+    return b, x - (1 << b) if x >= (1 << (b - 1)) else x
+
+
 def main():
     replay_lua = Path(__file__).parent / 'replay.lua'
     replay = list(read_replay(replay_lua))
