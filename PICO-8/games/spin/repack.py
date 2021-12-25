@@ -191,11 +191,10 @@ def chunked(iterable, n):
 
 
 def signed_bit_length(x: int) -> int:
-    b = 1
-    while True:
-        if -(2 ** (b - 1)) <= x <= (2 ** (b - 1)) - 1:
-            return b
-        b += 1
+    if x < 0:
+        return 1 + (-x - 1).bit_length()
+    else:
+        return 1 + x.bit_length()
 
 
 def bit_mask(b: int) -> int:
@@ -213,11 +212,6 @@ def unsigned_bits(b: int, x: int) -> BitVector:
 
 def concat_bits(bvs: Iterable[BitVector]) -> BitVector:
     return reduce(operator.add, bvs, BitVector(size=0))
-
-
-def bits_to_bytes(bv: BitVector) -> bytes:
-    assert len(bv) % 8 == 0
-    return bytes(int(bv[i:i + 8]) for i in range(0, len(bv), 8))
 
 
 def as_signed(bv: BitVector) -> int:
