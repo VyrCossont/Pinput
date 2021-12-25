@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import sys
-from collections import Counter
 from functools import reduce
-from itertools import chain, groupby, islice
+from itertools import chain
 from math import ceil
 import operator
 from pathlib import Path
-from statistics import quantiles, mean, median, mode
 import re
 from typing import NamedTuple, DefaultDict, List, Iterable, Optional, Union
 import zlib
@@ -15,25 +13,17 @@ import zlib
 """
 Prototype compressor for Spin replay data: recordings of analog stick positions.
 Currently uses very inefficient delta encoder and gets about 50% compression.
-Compression code is absurd. Do not read. Decompression code is better.
-(I wanted to see how much compression I could get without actually knowing anything about compression.)
 No Lua implementation exists yet.
 
 accumulator (i16): starts at 0
 
 structure:
-    length (u16): Number of 2-byte values in decompressed data
-    runs ([run]): not actually runs in RLE sense, maybe groups would be a better name.
-
-run:
-    b (u4): bit size of symbols in run - 1.
-        b = 15 indicates that the run content is 16-bit literals, not deltas.
-    n (u4): number of symbols in run - 1
-    symbols ([literal]|[delta]): not actually symbols in Huffman sense, maybe elements would be a better name.
-
-literal (i16): signed value to be copied directly into accumulator
-
-delta (i<b> where b in [1, 15]): signed value to be added to accumulator
+    length (varint): Number of 2-byte values in decompressed data
+    values ([varint]): Either literals or deltas.
+        Literals are always encoded as 16 data bits, even if this is overlong,
+        and deltas with fewer.
+        If value has 16 data bits, copy it directly into accmulator.
+        If fewer, add it to accumulator.
 """
 
 
@@ -181,15 +171,6 @@ def read_replay(path):
                     print(f"bad line: {line}", file=sys.stderr)
 
 
-def chunked(iterable, n):
-    iterator = iter(iterable)
-    while True:
-        chunk = list(islice(iterator, n))
-        if not chunk:
-            return
-        yield chunk
-
-
 def signed_bit_length(x: int) -> int:
     if x < 0:
         return 1 + (-x - 1).bit_length()
@@ -205,22 +186,21 @@ def signed_bits(b: int, x: int) -> BitVector:
     return BitVector(size=b, bits=bit_mask(b) & x)
 
 
-def unsigned_bits(b: int, x: int) -> BitVector:
-    assert x >= 0
-    return BitVector(size=b, bits=x)
-
-
 def concat_bits(bvs: Iterable[BitVector]) -> BitVector:
     return reduce(operator.add, bvs, BitVector(size=0))
 
 
-def as_signed(bv: BitVector) -> int:
-    b = len(bv)
-    x = int(bv)
-    return x - (1 << b) if x >= (1 << (b - 1)) else x
+def varint_encoded_length(b: int, group_size: int = 3) -> int:
+    """
+    :param b: Length of data in bits.
+    :param group_size: Number of data bits in each encoding group.
+    :return: Total data and continuation bits it'd take to encode the data as a varint.
+    """
+    num_groups = ceil(b / group_size)
+    return num_groups * (1 + group_size)
 
 
-def write_varint(x: int, group_size: int = 3) -> BitVector:
+def write_varint(x: int, group_size: int = 3, force_bit_length: Optional[int] = None) -> BitVector:
     """
     Write signed integer as nibbles,
     each one consisting of a continuation flag
@@ -228,7 +208,7 @@ def write_varint(x: int, group_size: int = 3) -> BitVector:
     followed by 3 data bits, least significant bits first.
     """
     groups = []
-    b = signed_bit_length(x)
+    b = force_bit_length or signed_bit_length(x)
     num_groups = ceil(b / group_size)
     for i in range(num_groups):
         bits = x & bit_mask(group_size)
@@ -245,7 +225,7 @@ def write_varint(x: int, group_size: int = 3) -> BitVector:
 def read_varint(bv: BitVector, group_size: int = 3) -> (int, int):
     """
     Read signed integer from nibbles.
-    :return: (number of data bits used to store integer, value)
+    :return: (total number of data and continuation bits used to store integer, value)
     """
     x = 0
     b = 0
@@ -256,7 +236,10 @@ def read_varint(bv: BitVector, group_size: int = 3) -> (int, int):
         if bv[pos + group_size] == 0:
             break
         pos += 1 + group_size
-    return b, x - (1 << b) if x >= (1 << (b - 1)) else x
+    return (
+        1 + group_size + pos,
+        x - (1 << b) if x >= (1 << (b - 1)) else x
+    )
 
 
 def main():
@@ -273,36 +256,7 @@ def main():
     # just mash all the columns together for stats
     column = list(chain.from_iterable(columns.values()))
     column_data_bytes = bytes(concat_bits(signed_bits(16, x) for x in column))
-
-    # let's get those stats
-    bit_lengths = Counter()
-
-    bytes_before = 2 * len(column)
-    print(f'bytes_before: {bytes_before}')
-
-    initial_acc = 0
-    deltas = [initial_acc - column[0]] + list(map(operator.sub, column[1:], column[:-1]))
-    print(f'longest delta: {max(deltas, key=lambda delta: signed_bit_length(delta)):x}')
-
-    for d in deltas:
-        bit_lengths[signed_bit_length(d)] += 1
-
-    run_lengths = [len(list(run)) for _, run in groupby(deltas, lambda delta: signed_bit_length(delta))]
-    print(f'len(run_lengths): {len(run_lengths)}')
-    print(f'max(run_lengths): {max(run_lengths)}')
-    print(f'mean(run_lengths): {mean(run_lengths)}')
-    print(f'median(run_lengths): {median(run_lengths)}')
-    print(f'mode(run_lengths): {mode(run_lengths)}')
-    print(f'quantiles(run_lengths, n=16): {quantiles(run_lengths, n=16)}')
-
-    print()
-
-    print('bit_lengths:')
-    for k in sorted(bit_lengths.keys(), reverse=True):
-        n = bit_lengths[k]
-        print(f'  {k}: {n}')
-
-    print()
+    print(f'len(column_data_bytes): {len(column_data_bytes)}')
 
     compressed_data_bytes = compress(column)
     print(f'len(compressed_data_bytes): {len(compressed_data_bytes)}')
@@ -319,124 +273,36 @@ def main():
     print(f'len(zlib_data_bytes): {len(zlib_data_bytes)}')
 
 
-class Symbol:
-    pass
-
-    def bit_length(self) -> int:
-        raise NotImplementedError
-
-    def bits(self) -> BitVector:
-        raise NotImplementedError
-
-
-class Run(Symbol):
-    b: int
-    syms: List[Symbol]
-
-    def __init__(self, b: int, syms: List[Symbol]):
-        assert 1 <= b <= 16
-        assert 1 <= len(syms) <= 16
-        self.b = b
-        self.syms = syms
-
-    # noinspection PyMethodMayBeStatic
-    def bit_length(self) -> int:
-        return 8 + self.b * len(self.syms)
-
-    def bits(self) -> BitVector:
-        return concat_bits(
-            chain(
-                [
-                    unsigned_bits(4, self.b - 1),
-                    unsigned_bits(4, len(self.syms) - 1),
-                ],
-                (sym.bits() for sym in self.syms)
-            )
-        )
-
-
-# TODO: using symmetric signed deltas would let us represent 0 as a 0-bit delta, instead of a 1-bit delta
-class Delta(Symbol):
-    d: int
-
-    def __init__(self, d: int):
-        self.d = d
-
-    def bit_length(self) -> int:
-        return signed_bit_length(self.d)
-
-    def bits(self) -> BitVector:
-        return signed_bits(self.bit_length(), self.d)
-
-
-class Literal(Symbol):
-    x: int
-
-    def __init__(self, x: int):
-        assert signed_bit_length(x) <= 16, x
-        self.x = x
-
-    # noinspection PyMethodMayBeStatic
-    def bit_length(self) -> int:
-        return 16
-
-    def bits(self) -> BitVector:
-        return signed_bits(self.bit_length(), self.x)
-
-
 def compress(column) -> bytes:
     """Now let's try to compress it!"""
 
     initial_acc = 0
     deltas = [initial_acc - column[0]] + list(map(operator.sub, column[1:], column[:-1]))
-    symbols = []
+    chunks = [write_varint(len(column))]
     for x, d in zip(column, deltas):
         if signed_bit_length(d) >= 16:
-            symbols.append(Literal(x))
+            # Write it as a literal of 16 data bits.
+            v = write_varint(x, force_bit_length=16)
         else:
-            symbols.append(Delta(d))
-
-    runs = list(chain.from_iterable(
-        (Run(b, list(chunk)) for chunk in chunked(run, 16))
-        for b, run
-        in groupby(symbols, lambda sym: sym.bit_length())
-    ))
-
-    print('compressed:')
-    # Run lengths here are shorter because runs are capped at 16 symbols.
-    run_lengths = [len(run.syms) for run in runs]
-    print(f'len(run_lengths): {len(run_lengths)}')
-    print(f'max(run_lengths): {max(run_lengths)}')
-    print(f'mean(run_lengths): {mean(run_lengths)}')
-    print(f'median(run_lengths): {median(run_lengths)}')
-    print(f'mode(run_lengths): {mode(run_lengths)}')
-    print(f'quantiles(run_lengths, n=16): {quantiles(run_lengths, n=16)}')
-
-    print()
-
-    compressed_data_bits = Literal(len(column)).bits() + concat_bits(run.bits() for run in runs)
-    return bytes(compressed_data_bits)
+            v = write_varint(d)
+        chunks.append(v)
+    return bytes(concat_bits(chunks))
 
 
 def decompress(data: bytes) -> Iterable[int]:
     bv = BitVector(bytes=data)
-    samples = int(bv[:16])
-    pos = 16
-    count = 0
+    pos, samples = read_varint(bv)
     acc = 0
-    while count < samples:
-        run_b = 1 + int(bv[pos: pos + 4])
-        run_count = 1 + int(bv[pos + 4: pos + 8])
-        pos += 8
-        for _ in range(run_count):
-            v = as_signed(bv[pos: pos + run_b])
-            if run_b == 16:
-                acc = v
-            else:
-                acc += v
-            pos += run_b
-            count += 1
-            yield acc
+    for _ in range(samples):
+        d_pos, v = read_varint(bv[pos:])
+        d_pos, v = read_varint(bv[pos:pos+d_pos])
+        if d_pos >= varint_encoded_length(16):
+            # We forced all literals to encode 16 data bits.
+            acc = v
+        else:
+            acc += v
+        pos += d_pos
+        yield acc
 
 
 if __name__ == '__main__':

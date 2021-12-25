@@ -1,4 +1,4 @@
-from repack import write_varint, read_varint, BitVector
+from repack import write_varint, read_varint, varint_encoded_length, BitVector
 
 
 class TestVarint:
@@ -22,12 +22,17 @@ class TestVarint:
         assert write_varint(-0x80) == BitVector(size=12, bits=0b0110_1000_1000)
 
     def test_read_short(self):
-        assert read_varint(BitVector(size=4, bits=0b0000)) == (3, 0)
-        assert read_varint(BitVector(size=4, bits=0b0001)) == (3, 1)
+        assert read_varint(BitVector(size=4, bits=0b0000)) == (4, 0)
+        assert read_varint(BitVector(size=4, bits=0b0001)) == (4, 1)
 
     def test_read_short_neg(self):
-        assert read_varint(BitVector(size=4, bits=0b0111)) == (3, -1)
+        assert read_varint(BitVector(size=4, bits=0b0111)) == (4, -1)
 
     def test_read_long(self):
-        assert read_varint(BitVector(size=8, bits=0b0001_1111)) == (6, 0xf)
-        assert read_varint(BitVector(size=12, bits=0b0011_1111_1111)) == (9, 0xff)
+        assert read_varint(BitVector(size=8, bits=0b0001_1111)) == (8, 0xf)
+        assert read_varint(BitVector(size=12, bits=0b0011_1111_1111)) == (12, 0xff)
+
+    def test_encoded_length(self):
+        assert varint_encoded_length(1) == 4
+        assert varint_encoded_length(15) == 20
+        assert varint_encoded_length(16) == 24
