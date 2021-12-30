@@ -47,8 +47,8 @@ function enemy_init()
   death_color = 11,
   bullet_r = 2,
   ship_r = 4,
-  seek_speed = 0.2,
-  dodge_speed = 0.4,
+  seek_speed = 0.4,
+  dodge_speed = 0.3,
   dthrob = 0.01,
  }
 end
@@ -59,6 +59,7 @@ function update_throb(enemies, enemy)
 end
 
 function seek_player(enemies, enemy)
+ -- todo: this might be affected by L2 overflow
  local dist_x = enemy.x - ship.x
  local dist_y = enemy.y - ship.y
  local dist = sqrt(dist_x ^ 2 + dist_y ^ 2)
@@ -98,7 +99,8 @@ function dodge(enemies, enemy)
  local closest_bullet = nil
  for b = #bullets, 1, -1 do
   local bullet = bullets[b]
-  local dist = sqrt((bullet.x - enemy.x) ^ 2 + (bullet.y - enemy.y) ^ 2)
+  -- use Manhattan/L1 distance instead of Euclidean/L2 so we don't overflow
+  local dist = abs(bullet.x - enemy.x) + abs(bullet.y - enemy.y)
   if closest_dist == nil or dist < closest_dist then
    closest_dist = dist
    closest_bullet = bullet
@@ -114,10 +116,10 @@ function dodge(enemies, enemy)
  local dist_y = closest_bullet.y - enemy.y
  -- todo: don't let them dodge faster diagonally, do it right
  if abs(dist_x) > 0 then
-  enemy.x = enemy.x + sgn(dist_x) * enemies.dodge_speed
+  enemy.x = enemy.x - sgn(dist_x) * enemies.dodge_speed
  end
  if abs(dist_y) > 0 then
-  enemy.y = enemy.y + sgn(dist_y) * enemies.dodge_speed
+  enemy.y = enemy.y - sgn(dist_y) * enemies.dodge_speed
  end
 end
 
