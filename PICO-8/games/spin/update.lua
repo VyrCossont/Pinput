@@ -151,5 +151,19 @@ function update60()
   check_bullet_collision(pinwheels, pinwheel, i)
  end
 
+ for i = #leprechauns, 1, -1 do
+  local leprechaun = leprechauns[i]
+
+  update_throb(leprechauns, leprechaun)
+  seek_player(leprechauns, leprechaun)
+  dodge(leprechauns, leprechaun)
+  clamp_to_world(leprechaun)
+  local ship_dead = check_ship_collision(leprechauns, leprechaun)
+  if ship_dead then
+   return
+  end
+  check_bullet_collision(leprechauns, leprechaun, i)
+ end
+
  spawn_update60()
 end

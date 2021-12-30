@@ -42,6 +42,15 @@ function enemy_init()
   drift_speed = 0.1,
   dthrob = 0.01,
  }
+
+ leprechauns = {
+  death_color = 11,
+  bullet_r = 2,
+  ship_r = 4,
+  seek_speed = 0.2,
+  dodge_speed = 0.4,
+  dthrob = 0.01,
+ }
 end
 
 -- update animation state
@@ -80,6 +89,36 @@ end
 function clamp_to_world(enemy)
   enemy.x = mid(-world_r, enemy.x, world_r)
   enemy.y = mid(-world_r, enemy.y, world_r)
+end
+
+-- dodge closest bullet
+-- todo: slow, could use spatial index here if we had one
+function dodge(enemies, enemy)
+ local closest_dist = nil
+ local closest_bullet = nil
+ for b = #bullets, 1, -1 do
+  local bullet = bullets[b]
+  local dist = sqrt((bullet.x - enemy.x) ^ 2 + (bullet.y - enemy.y) ^ 2)
+  if closest_dist == nil or dist < closest_dist then
+   closest_dist = dist
+   closest_bullet = bullet
+  end
+ end
+ if closest_bullet == nil then
+  return
+ end
+
+ debug_draw(line, enemy.x, enemy.y, closest_bullet.x, closest_bullet.y, 8)
+
+ local dist_x = closest_bullet.x - enemy.x
+ local dist_y = closest_bullet.y - enemy.y
+ -- todo: don't let them dodge faster diagonally, do it right
+ if abs(dist_x) > 0 then
+  enemy.x = enemy.x + sgn(dist_x) * enemies.dodge_speed
+ end
+ if abs(dist_y) > 0 then
+  enemy.y = enemy.y + sgn(dist_y) * enemies.dodge_speed
+ end
 end
 
 -- kill ship on contact

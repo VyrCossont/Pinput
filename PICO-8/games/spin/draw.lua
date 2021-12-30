@@ -24,6 +24,14 @@ function _draw()
  print("    _draw: " .. cpu_draw .. "\n_update60: " .. cpu_update60, 2, 2, 8)
 end
 
+debug_shapes = {}
+
+-- defer a draw function from update code
+-- until the camera's set up to draw it
+function debug_draw(fn, ...)
+ add(debug_shapes, {fn, pack(...)})
+end
+
 function draw()
  cls()
 
@@ -97,4 +105,19 @@ function draw()
    pinwheel.throb
   )
  end
+
+ for leprechaun in all(leprechauns) do
+  vspr(
+   shape_leprechaun,
+   leprechaun.x, leprechaun.y,
+   3, 3,
+   leprechaun.throb
+  )
+ end
+
+ for debug_shape in all(debug_shapes) do
+  local fn, args = unpack(debug_shape)
+  fn(unpack(args))
+ end
+ debug_shapes = {}
 end

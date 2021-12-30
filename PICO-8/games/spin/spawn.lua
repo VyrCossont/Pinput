@@ -5,7 +5,7 @@ function spawn_init()
  -- used by brightline
  spawn_x, spawn_y = 16, 0
  -- _update60 calls until spawn cursor advances
- spawn_interval = 60
+ spawn_interval = 120
  -- calls remaining until spawn cursor advances
  spawn_counter = 0
  -- enemies spawn in waves
@@ -70,6 +70,13 @@ function spawn_update60()
     })
    elseif c == 14 then
     add(splitters, {
+     wave = sprite_num,
+     x = world_x,
+     y = world_y,
+     throb = 0,
+    })
+   elseif c == 11 then
+    add(leprechauns, {
      wave = sprite_num,
      x = world_x,
      y = world_y,
