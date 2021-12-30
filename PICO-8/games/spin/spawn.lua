@@ -50,11 +50,22 @@ function spawn_update60()
    world_y = mid(-world_r, world_y, world_r)
 
    -- switch on pixel color
+   -- todo: rewrite as constructor
    if c == 12 then
     add(diamonds, {
      wave = sprite_num,
      x = world_x,
      y = world_y,
+     throb = 0,
+    })
+   elseif c == 13 then
+    local theta = rnd()
+    add(pinwheels, {
+     wave = sprite_num,
+     x = world_x,
+     y = world_y,
+     dx = pinwheels.drift_speed * cos(theta),
+     dy = pinwheels.drift_speed * sin(theta),
      throb = 0,
     })
    elseif c == 14 then

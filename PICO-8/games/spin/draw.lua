@@ -88,4 +88,13 @@ function draw()
    splitter_frag.throb
   )
  end
+
+ for pinwheel in all(pinwheels) do
+  vspr(
+   shape_pinwheel,
+   pinwheel.x, pinwheel.y,
+   3, 3,
+   pinwheel.throb
+  )
+ end
 end

@@ -33,6 +33,15 @@ function enemy_init()
   -- splitter frag throb is actually orbit speed
   dthrob = 0.02,
  }
+
+ pinwheels = {
+  death_color = 13,
+  bullet_r = 2,
+  ship_r = 4,
+  -- no seek speed: pinwheels don't seek, they just drift
+  drift_speed = 0.1,
+  dthrob = 0.01,
+ }
 end
 
 -- update animation state
@@ -48,6 +57,22 @@ function seek_player(enemies, enemy)
   -- todo: don't let them move faster diagonally, do it right
   enemy.x = enemy.x - sgn(dist_x) * enemies.seek_speed
   enemy.y = enemy.y - sgn(dist_y) * enemies.seek_speed
+ end
+end
+
+-- keep going in the direction we were going
+function drift(enemy)
+ enemy.x = enemy.x + enemy.dx
+ enemy.y = enemy.y + enemy.dy
+end
+
+-- change directions when we hit the edge of the world
+function bounce(enemy)
+ if enemy.x < -world_r or enemy.x > world_r then
+  enemy.dx = -enemy.dx
+ end
+ if enemy.y < -world_r or enemy.y > world_r then
+  enemy.dy = -enemy.dy
  end
 end
 

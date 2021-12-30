@@ -137,5 +137,19 @@ function update60()
   check_bullet_collision(splitter_frags, splitter_frag, i)
  end
 
+ for i = #pinwheels, 1, -1 do
+  local pinwheel = pinwheels[i]
+
+  update_throb(pinwheels, pinwheel)
+  drift(pinwheel)
+  bounce(pinwheel)
+  clamp_to_world(pinwheel)
+  local ship_dead = check_ship_collision(pinwheels, pinwheel)
+  if ship_dead then
+   return
+  end
+  check_bullet_collision(pinwheels, pinwheel, i)
+ end
+
  spawn_update60()
 end

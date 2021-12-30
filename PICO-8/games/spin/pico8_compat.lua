@@ -90,9 +90,12 @@ abs = math.abs
 
 -- https://www.lexaloffle.com/dl/docs/pico-8_manual.html#RND
 -- https://www.lua.org/manual/5.4/manual.html#pdf-math.random
+-- undocumented: x defaults to 1
 function rnd(x)
  if type(x) == table then
   return x[math.random(1, #x)]
+ elseif x == nil then
+  return math.random()
  else
   return x * math.random()
  end
