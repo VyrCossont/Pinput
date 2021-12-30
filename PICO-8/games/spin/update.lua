@@ -15,6 +15,13 @@ function update60()
   return
  end
 
+ local skip = slowdown_update60()
+ if skip then
+  return
+ end
+
+ overlay_update60()
+
  -- advance replay, if there is one
  record_playback_advance()
 
@@ -94,6 +101,9 @@ function update60()
    bullet.y = bullet.y + bullet.dy
   end
  end
+
+ -- perform all enemy behavior
+ -- todo: extract these to classes or ECS
 
  for i = #diamonds, 1, -1 do
   local diamond = diamonds[i]

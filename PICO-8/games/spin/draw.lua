@@ -17,19 +17,15 @@ function _draw()
  draw()
  cpu_draw = stat(1) - cpu_base
 
+ overlay_draw()
+
  -- reset camera for profiling HUD
  camera()
 
  -- CPU
- print("    _draw: " .. cpu_draw .. "\n_update60: " .. cpu_update60, 2, 2, 8)
-end
-
-debug_shapes = {}
-
--- defer a draw function from update code
--- until the camera's set up to draw it
-function debug_draw(fn, ...)
- add(debug_shapes, {fn, pack(...)})
+ print("    _draw: " .. cpu_draw, 2, 2, 8)
+ print("_update60: " .. cpu_update60)
+ print(" slowdown: " .. slowdown_divider .. ":1")
 end
 
 function draw()
@@ -69,6 +65,9 @@ function draw()
  end
 
  vspr(shape_claw, ship.x, ship.y, 1.5, 1.5, ship.theta)
+
+ -- draw enemy shapes
+ -- todo: extract these to classes or ECS
 
  for diamond in all(diamonds) do
   vspr(
@@ -114,10 +113,4 @@ function draw()
    leprechaun.throb
   )
  end
-
- for debug_shape in all(debug_shapes) do
-  local fn, args = unpack(debug_shape)
-  fn(unpack(args))
- end
- debug_shapes = {}
 end

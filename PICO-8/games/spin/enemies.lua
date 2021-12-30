@@ -108,7 +108,7 @@ function dodge(enemies, enemy)
   return
  end
 
- debug_draw(line, enemy.x, enemy.y, closest_bullet.x, closest_bullet.y, 8)
+ overlay_defer(line, enemy.x, enemy.y, closest_bullet.x, closest_bullet.y, 8)
 
  local dist_x = closest_bullet.x - enemy.x
  local dist_y = closest_bullet.y - enemy.y
