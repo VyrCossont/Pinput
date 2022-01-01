@@ -4,6 +4,8 @@
 -- which double as enemy lists
 function enemy_init()
  diamonds = {
+  -- points for killing this (not pre-shifted by 16)
+  points = 50,
   -- color of sparks when one dies
   death_color = 12,
   -- collision radius with bullets
@@ -17,6 +19,7 @@ function enemy_init()
  }
 
  splitters = {
+  points = 100,
   death_color = 14,
   bullet_r = 2,
   ship_r = 4,
@@ -25,6 +28,7 @@ function enemy_init()
  }
 
  splitter_frags = {
+  points = 50,
   death_color = 14,
   bullet_r = 1,
   ship_r = 2,
@@ -35,6 +39,7 @@ function enemy_init()
  }
 
  pinwheels = {
+  points = 25,
   death_color = 13,
   bullet_r = 2,
   ship_r = 4,
@@ -44,6 +49,7 @@ function enemy_init()
  }
 
  leprechauns = {
+  points = 100,
   death_color = 11,
   bullet_r = 2,
   ship_r = 4,

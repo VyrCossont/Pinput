@@ -18,6 +18,16 @@ function world_init()
  world_r = 128
  display_dead = 0
  particles = {}
+ score = 0
+ num_bombs = 3
+ num_lives = 3
+ max_bombs = 9
+ max_lives = 9
+ max_multiplier = 10
+ per_life_init()
+end
+
+function per_life_init()
  ship = {
   x = 0,
   y = 0,
@@ -26,12 +36,19 @@ function world_init()
  bullets = {}
  fire_counter = 0
  fire_cooldown = 4
+ bomb_counter = 0
+ bomb_cooldown = 60
+ multiplier = 1
+ kills = 0
 end
 
 -- todo: move this
 function kill_ship()
  -- restart game
  restart_init()
+
+ -- mark player as dead for a second
+ display_dead = 60
 
  -- particle blast from ship
  for _ = 1, 16 do
@@ -43,7 +60,4 @@ function kill_ship()
    color = 10,
   })
  end
-
- -- mark player as dead for a second
- display_dead = 60
 end

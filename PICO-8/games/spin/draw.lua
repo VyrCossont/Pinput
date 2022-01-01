@@ -1,5 +1,10 @@
 -- _draw()
 
+-- custom characters
+glyph_bomb = "\^:1c22414941221c00"
+glyph_claw = "\^:002442663c180000"
+
+-- _draw() call timer
 cpu_draw = 0
 
 function _draw()
@@ -19,17 +24,95 @@ function _draw()
 
  overlay_draw()
 
- -- reset camera for profiling HUD
+ -- reset camera for HUD
  camera()
 
- -- CPU
- print("    _draw: " .. cpu_draw, 2, 2, 8)
+ -- profiling/debug HUD at bottom of screen
+ -- todo: why does this cause problems if we draw it after the game HUD?
+ print("    _draw: " .. cpu_draw, 0, 110, 8)
  print("_update60: " .. cpu_update60)
  print(" slowdown: " .. slowdown_divider .. ":1")
+
+ -- game HUD at top of screen
+ print(
+  "SCORE     "
+  .. hud_lives_text()
+  .. hud_bombs_text()
+  .. " HIGHSCORE",
+  0, 0, 15
+ )
+ print(
+  hud_score_text()
+  .. "              "
+  .. hud_highscore_text()
+ )
+end
+
+-- todo: reuse/extract format functions
+
+-- always 3 chars wide
+function hud_lives_text()
+ if num_lives > 3 then
+  return " " .. num_lives .. glyph_claw
+ else
+  local s = ""
+  for _ = 1, num_lives do
+   s = glyph_claw .. s
+  end
+  while #s < 3 do
+   s = " " .. s
+  end
+  return s
+ end
+end
+
+-- always 3 chars wide
+function hud_bombs_text()
+ if num_bombs > 3 then
+  return glyph_bomb .. num_bombs .. " "
+ else
+  local s = ""
+  for _ = 1, num_bombs do
+   s = s .. glyph_bomb
+  end
+  while #s < 3 do
+   s = s .. " "
+  end
+  return s
+ end
+end
+
+-- always 9 chars wide
+function hud_score_text()
+ local s = tostr(score, 2)
+ local chunks = {}
+ for i = #s, 1, -3 do
+  add(
+   chunks,
+   sub(s, max(0, i - 2), i),
+   1)
+ end
+ s = chunks[1]
+ for i = 2, #chunks do
+  s = s .. "," .. chunks[i]
+ end
+ while #s < 9 do
+  s = s .. " "
+ end
+ return s
+end
+
+-- always 9 chars wide
+function hud_highscore_text()
+ -- todo: store high score in cartdata
+ return "9,999,999"
 end
 
 function draw()
  cls()
+
+ -- remap peach to lime green
+ pal(15, 138, 1)
 
  -- let the camera follow the player with a little parallax
  camera(-64 + (ship.x * 0.8), -64 + (ship.y * 0.8))
