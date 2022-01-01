@@ -1,4 +1,5 @@
 -- input recording/playback
+-- todo: update to some Repack compressed format
 
 -- set to true to create recordings of every game
 record_enabled = false
@@ -39,9 +40,19 @@ function record_playback_pi_stick(s)
  end
 end
 
+-- todo: test this
+function record_playback_pi_trigger(s)
+ if s == pi_lt then
+  return record_state.lt
+ elseif s == pi_rt then
+  return record_state.rt
+ end
+end
+
 -- if a replay is loaded, redefine input system
 if record_replay ~= nil then
  pi_stick = record_playback_pi_stick
+ pi_trigger = record_playback_pi_trigger
 end
 
 -- setup for recording or playing back inputs
@@ -55,6 +66,8 @@ function record_init()
   ly = 0,
   rx = 0,
   ry = 0,
+  lt = 0,
+  rt = 0,
  }
 
  -- playback state
@@ -110,7 +123,7 @@ function record_changed(t1, t2)
 end
 
 -- if inputs change, record time and any changed inputs
-function record_frame_inputs(lx, ly, rx, ry)
+function record_frame_inputs(lx, ly, rx, ry, lt, rt)
  -- don't record if disabled or a replay is loaded
  if not record_enabled or record_replay ~= nil then
   return
@@ -123,6 +136,8 @@ function record_frame_inputs(lx, ly, rx, ry)
      ly = ly,
      rx = rx,
      ry = ry,
+     lt = lt,
+     rt = rt,
     }
   )
  if changed then

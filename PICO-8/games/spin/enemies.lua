@@ -8,8 +8,9 @@ function enemy_init()
   points = 50,
   -- color of sparks when one dies
   death_color = 12,
+  -- todo: retire this
   -- collision radius with bullets
-  bullet_r = 2,
+  bullet_r = 4,
   -- collision radius with ship
   ship_r = 4,
   -- speed towards player
@@ -21,7 +22,7 @@ function enemy_init()
  splitters = {
   points = 100,
   death_color = 14,
-  bullet_r = 2,
+  bullet_r = 4,
   ship_r = 4,
   seek_speed = 0.2,
   dthrob = 0.01,
@@ -30,18 +31,19 @@ function enemy_init()
  splitter_frags = {
   points = 50,
   death_color = 14,
-  bullet_r = 1,
+  bullet_r = 2,
   ship_r = 2,
   -- no seek speed: splitter frags don't seek
   orbit_r = 15,
   -- splitter frag throb is actually orbit speed
+  -- todo: factor out the 2 into the orbit function and unify dthrob
   dthrob = 0.02,
  }
 
  pinwheels = {
   points = 25,
   death_color = 13,
-  bullet_r = 2,
+  bullet_r = 4,
   ship_r = 4,
   -- no seek speed: pinwheels don't seek, they just drift
   drift_speed = 0.1,
@@ -51,7 +53,7 @@ function enemy_init()
  leprechauns = {
   points = 100,
   death_color = 11,
-  bullet_r = 2,
+  bullet_r = 4,
   ship_r = 4,
   seek_speed = 0.4,
   dodge_speed = 0.3,
@@ -150,30 +152,66 @@ function check_bullet_collision(enemies, enemy, i)
   if abs(enemy.x - bullet.x) < enemies.bullet_r
   and abs(enemy.y - bullet.y) < enemies.bullet_r then
    deli(bullets, b)
-   deli(enemies, i)
 
-   -- particle blast
-   for _ = 1, 8 do
-    add(particles, {
-     x = enemy.x,
-     y = enemy.y,
-     dx = rnd(5) - 2.5,
-     dy = rnd(5) - 2.5,
-     color = enemies.death_color,
-    })
-   end
+   -- update score, inventory, and multiplier
+   local prev_score = score
+   score = score + ((enemies.points * multiplier) >> 16)
+   num_bombs = num_bombs + (
+    flr(score / incr_bombs)
+    - flr(prev_score / incr_bombs)
+   )
+   num_lives = num_lives + (
+    flr(score / incr_lives)
+    - flr(prev_score / incr_lives)
+   )
+   kills = kills + 1
+   multiplier = mid(
+    1,
+    ceil_log2(kills / 10),
+    max_multiplier
+   )
 
-   -- decrement wave counter
-   waves[enemy.wave] = waves[enemy.wave] - 1
-   if waves[enemy.wave] == 0 then
-    waves[enemy.wave] = nil
-    spawn_counter = 0
-   end
-
+   kill_enemy(enemies, enemy, i)
    return true
   end
  end
  return false
+end
+
+-- die if inside bomb blast
+-- bombs do not affect score or multiplier
+-- todo: double-check on the score part
+function check_bomb_collision(enemies, enemy, i)
+ if bomb_blast.ttl < 0 then
+  return
+ end
+ local d = l2_dist(enemy.x - bomb_blast.x, enemy.y - bomb_blast.y)
+ if d <= bomb_blast.r then
+  kill_enemy(enemies, enemy, i)
+ end
+end
+
+-- remove an enemy, explode it, and update its wave
+function kill_enemy(enemies, enemy, i)
+ deli(enemies, i)
+
+ -- particle blast
+ for _ = 1, 8 do
+  add(particles, {
+   x = enemy.x,
+   y = enemy.y,
+   dx = rnd(5) - 2.5,
+   dy = rnd(5) - 2.5,
+   color = enemies.death_color,
+  })
+ end
+
+ -- decrement wave counter
+ waves[enemy.wave] = waves[enemy.wave] - 1
+ if waves[enemy.wave] == 0 then
+  waves[enemy.wave] = nil
+  spawn_counter = 0
+ end
 end
 
 -- break into three chunks on death

@@ -5,6 +5,7 @@ __lua__
 -- @VyrCossont
 
 #include ../pinput.lua
+#include spin/math.lua
 #include spin/debug.lua
 #include spin/init.lua
 #include spin/update.lua

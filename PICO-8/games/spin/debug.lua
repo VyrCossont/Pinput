@@ -1,5 +1,20 @@
 -- debugging functions
 
+function overlay_init()
+-- render debug overlay and profiling HUD
+ overlay_enabled = true
+ overlay_callback()
+end
+
+function overlay_callback()
+ overlay_enabled = not overlay_enabled
+ if overlay_enabled then
+  menuitem(1, "◆ debug overlay", overlay_callback)
+ else
+  menuitem(1, "○ debug overlay", overlay_callback)
+ end
+end
+
 -- draw functions to be called in draw calls until next update
 overlay_deferreds = {}
 
@@ -7,11 +22,17 @@ overlay_deferreds = {}
 -- until the camera's set up to draw it.
 -- probably cheaper than capturing all the args in a closure.
 function overlay_defer(fn, ...)
+ if not overlay_enabled then
+  return
+ end
  add(overlay_deferreds, {fn, pack(...)})
 end
 
 -- draw debugging overlay
 function overlay_draw()
+ if not overlay_enabled then
+  return
+ end
  for overlay_deferred in all(overlay_deferreds) do
   local fn, args = unpack(overlay_deferred)
   fn(unpack(args))
@@ -21,6 +42,17 @@ end
 -- reset debugging overlay
 function overlay_update60()
  overlay_deferreds = {}
+end
+
+-- draw profiling HUD
+function overlay_draw_hud()
+ if not overlay_enabled then
+  return
+ end
+ -- todo: if we draw this at 108, it messes up the camera?
+ print("    _draw: " .. cpu_draw, 0, 104, 8)
+ print("_update60: " .. cpu_update60)
+ print(" slowdown: " .. slowdown_divider .. ":1")
 end
 
 -- slow time

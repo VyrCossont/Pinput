@@ -29,7 +29,9 @@ function update60()
  -- also used for actual input below
  local lx, ly = pi_stick(pi_l)
  local rx, ry = pi_stick(pi_r)
- record_frame_inputs(lx, ly, rx, ry)
+ local lt = pi_trigger(pi_lt)
+ local rt = pi_trigger(pi_rt)
+ record_frame_inputs(lx, ly, rx, ry, lt, rt)
 
  -- update particles
  -- do this even if we're dead
@@ -71,6 +73,28 @@ function update60()
     color = 10,
    })
   end
+ end
+
+ -- todo: collect all bomb code to its own subsystem
+
+ -- update bomb
+ if bomb_blast.ttl >= 0 then
+  bomb_blast.ttl = bomb_blast.ttl - 1
+  bomb_blast.r = bomb_blast.r + 3
+ end
+
+ -- drop bomb
+ if max(lt, rt) > 0 and bomb_ready and bomb_blast.ttl < 0 then
+  bomb_ready = false
+  if num_bombs > 0 then
+   num_bombs = num_bombs - 1
+   bomb_blast.x = ship.x
+   bomb_blast.y = ship.y
+   bomb_blast.r = 0
+   bomb_blast.ttl = bomb_duration
+  end
+ elseif max(lt, rt) == 0 then
+  bomb_ready = true
  end
 
  -- shoot bullets
@@ -116,6 +140,7 @@ function update60()
    return
   end
   check_bullet_collision(diamonds, diamond, i)
+  check_bomb_collision(diamonds, diamond, i)
  end
 
  for i = #splitters, 1, -1 do
@@ -132,6 +157,7 @@ function update60()
   if dead then
    splitter_split(splitter)
   end
+  check_bomb_collision(splitters, splitter, i)
  end
 
  for i = #splitter_frags, 1, -1 do
@@ -145,6 +171,7 @@ function update60()
    return
   end
   check_bullet_collision(splitter_frags, splitter_frag, i)
+  check_bomb_collision(splitter_frags, splitter_frag, i)
  end
 
  for i = #pinwheels, 1, -1 do
@@ -159,6 +186,7 @@ function update60()
    return
   end
   check_bullet_collision(pinwheels, pinwheel, i)
+  check_bomb_collision(pinwheels, pinwheel, i)
  end
 
  for i = #leprechauns, 1, -1 do
@@ -173,6 +201,7 @@ function update60()
    return
   end
   check_bullet_collision(leprechauns, leprechaun, i)
+  check_bomb_collision(leprechauns, leprechaun, i)
  end
 
  spawn_update60()

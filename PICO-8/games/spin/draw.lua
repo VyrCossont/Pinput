@@ -28,10 +28,7 @@ function _draw()
  camera()
 
  -- profiling/debug HUD at bottom of screen
- -- todo: why does this cause problems if we draw it after the game HUD?
- print("    _draw: " .. cpu_draw, 0, 110, 8)
- print("_update60: " .. cpu_update60)
- print(" slowdown: " .. slowdown_divider .. ":1")
+ overlay_draw_hud()
 
  -- game HUD at top of screen
  print(
@@ -145,6 +142,12 @@ function draw()
  for bullet in all(bullets) do
   local bullet_theta = atan2(bullet.dx, bullet.dy)
   vspr(shape_bullet, bullet.x, bullet.y, 1, 1, bullet_theta)
+ end
+
+ if bomb_blast.ttl >= 0 then
+  for i = 0, 2 do
+  circ(bomb_blast.x, bomb_blast.y, bomb_blast.r - i * 4, 7 - i)
+  end
  end
 
  vspr(shape_claw, ship.x, ship.y, 1.5, 1.5, ship.theta)

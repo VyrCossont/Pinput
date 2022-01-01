@@ -3,6 +3,7 @@
 -- one-time init
 function _init()
  pi_init()
+ overlay_init()
  restart_init()
 end
 
@@ -18,11 +19,18 @@ function world_init()
  world_r = 128
  display_dead = 0
  particles = {}
+ -- number of frames
+ bomb_duration = 30
+ -- treated as 32-bit int
  score = 0
  num_bombs = 3
  num_lives = 3
  max_bombs = 9
  max_lives = 9
+ -- treated as 32-bit int
+ incr_bombs = 100 * (10000 >> 16)
+ -- treated as 32-bit int
+ incr_lives = 75 * (10000 >> 16)
  max_multiplier = 10
  per_life_init()
 end
@@ -36,8 +44,15 @@ function per_life_init()
  bullets = {}
  fire_counter = 0
  fire_cooldown = 4
- bomb_counter = 0
- bomb_cooldown = 60
+ -- if ttl >= 0, bomb is exploding
+ bomb_blast = {
+  x = 0,
+  y = 0,
+  r = 0,
+  ttl = -1,
+ }
+ -- set to false when trigger pulled, set to true when trigger fully released
+ bomb_ready = true
  multiplier = 1
  kills = 0
 end
