@@ -53,7 +53,7 @@ function overlay_draw_hud()
  -- todo: if we draw this at 108, it messes up the camera?
  print("    _draw: " .. cpu_draw, 0, 104, 8)
  print("_update60: " .. cpu_update60)
- print(" slowdown: " .. slowdown_divider .. ":1")
+ print(" slowdown: " .. slowdown_divider .. ":1" .. " mouse: " .. stat(32) .. ", " .. stat(33))
 end
 
 -- slow time

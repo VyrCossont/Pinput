@@ -20,7 +20,6 @@ end
 
 -- compatibility input modes
 -- for when you're not cool enough to have Pinput installed
--- todo: extract these to Pinput SDK?
 
 -- does nothing
 function input_noop()
@@ -110,8 +109,10 @@ end
 
 devkit_flags_addr = 0x5f2d
 
+-- we won't get mouse lock on the BBS,
+-- but can work without it
 function devkit_init()
- poke(devkit_flags_addr, 1)
+ poke(devkit_flags_addr, 1 | 4)
 end
 
 function devkit_deinit()
@@ -120,16 +121,38 @@ end
 
 -- movement: WASD or arrows
 -- aiming: mouse
+-- see https://pico-8.fandom.com/wiki/Stat#.7B28.7D_Raw_keyboard
+-- and https://github.com/libsdl-org/SDL/blob/main/include/SDL_scancode.h
 function devkit_pi_stick(s)
  if s == pi_l then
-
+  local x, y = 0, 0
+  if stat(28, 26) or stat(28, 82) then
+   y = y - 1
+  end
+  if stat(28, 22) or stat(28, 81) then
+   y = y + 1
+  end
+  if stat(28, 4) or stat(28, 80) then
+   x = x - 1
+  end
+  if stat(28, 7) or stat(28, 79) then
+   x = x + 1
+  end
+  return x, y
  elseif s == pi_r then
-
+  local x = (mid(0, stat(32), 127)  - 64) >> 6
+  local y = (mid(0, stat(33), 127)  - 64) >> 6
+  -- deadzone
+  if abs(x ^ 2 + y ^ 2) < 0.1 then
+   return 0, 0
+  end
+  return x, y
  end
 end
 
-function devkit_pi_trigger(t)
- if stat(34) & (1 << t) == (1 << t) then
+-- space bar controls both triggers
+function devkit_pi_trigger()
+ if stat(28, 44) then
   return 0xff
  else
   return 0
