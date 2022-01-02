@@ -3,16 +3,17 @@
 function overlay_init()
 -- render debug overlay and profiling HUD
  overlay_enabled = true
- overlay_callback()
+ overlay_menuitem()
 end
 
-function overlay_callback()
+function overlay_menuitem()
  overlay_enabled = not overlay_enabled
  if overlay_enabled then
-  menuitem(1, "◆ debug overlay", overlay_callback)
+  menuitem(2, "◆ debug overlay", overlay_menuitem)
  else
-  menuitem(1, "○ debug overlay", overlay_callback)
+  menuitem(2, "○  debug overlay", overlay_menuitem)
  end
+ return true
 end
 
 -- draw functions to be called in draw calls until next update

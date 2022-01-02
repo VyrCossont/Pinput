@@ -11,7 +11,10 @@ end
 function update60()
  -- if we have no inputs, give up
  if record_replay == nil
- and (not pi_is_inited() or not pi_flag(pi_connected)) then
+ and (not input_is_inited() or not input_is_connected()) then
+  if btnp(4) or btnp(5) then
+   printh("https://github.com/VyrCossont/Pinput", "@clip")
+  end
   return
  end
 
@@ -27,10 +30,10 @@ function update60()
 
  -- read sticks here for recording purposes
  -- also used for actual input below
- local lx, ly = pi_stick(pi_l)
- local rx, ry = pi_stick(pi_r)
- local lt = pi_trigger(pi_lt)
- local rt = pi_trigger(pi_rt)
+ local lx, ly = input_stick(pi_l)
+ local rx, ry = input_stick(pi_r)
+ local lt = input_trigger(pi_lt)
+ local rt = input_trigger(pi_rt)
  record_frame_inputs(lx, ly, rx, ry, lt, rt)
 
  -- update particles

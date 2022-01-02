@@ -2,7 +2,7 @@
 
 -- one-time init
 function _init()
- pi_init()
+ input_init()
  overlay_init()
  restart_init()
 end

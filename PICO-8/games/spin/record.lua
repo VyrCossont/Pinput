@@ -50,6 +50,7 @@ function record_playback_pi_trigger(s)
 end
 
 -- if a replay is loaded, redefine input system
+-- todo: add this as an input mode to new input system
 if record_replay ~= nil then
  pi_stick = record_playback_pi_stick
  pi_trigger = record_playback_pi_trigger

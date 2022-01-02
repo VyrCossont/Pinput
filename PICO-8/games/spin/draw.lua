@@ -8,11 +8,30 @@ glyph_claw = "\^:002442663c180000"
 cpu_draw = 0
 
 function _draw()
- if record_replay == nil and not pi_is_inited() then
+ if record_replay == nil and not input_is_inited() then
   cls()
-  print("waiting for pinput connection...")
+  print("waiting for pINPUT connection...")
+  print("")
+  print("               \f1…\f6")
+  print("")
+  print("choose another input scheme from")
+  print("the pause menu (p or enter)")
+  print("")
+  print("devkit: wasd moves, mouse shoots")
+  print("        click to bomb")
+  print("")
+  print("p1+p2: p2 d-pad moves, p1 shoots")
+  print("       any button to bomb")
+  print("")
+  print("               \f1…\f6")
+  print("")
+  print("or get pINPUT here:")
+  print("")
+  print("\fcgithub.com/VyrCossont/Pinput\f6")
+  print("")
+  print("(press 🅾️ or ❎ to copy url)")
   return
- elseif record_replay == nil and not pi_flag(pi_connected) then
+ elseif record_replay == nil and not input_is_connected() then
   cls()
   print("player #1, connect your gamepad...")
   return
