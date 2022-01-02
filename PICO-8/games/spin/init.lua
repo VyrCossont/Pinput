@@ -1,7 +1,11 @@
 -- _init()
 
+cartdata_highscore = 0
+
 -- one-time init
 function _init()
+ cartdata("vyrcossont_geometry_wars_0")
+ highscore = dget(cartdata_highscore)
  input_init()
  overlay_init()
  restart_init()
@@ -59,6 +63,12 @@ end
 
 -- todo: move this
 function kill_ship()
+ -- save high score
+ if score > highscore then
+  highscore = score
+  dset(cartdata_highscore, highscore)
+ end
+
  -- restart game
  restart_init()
 

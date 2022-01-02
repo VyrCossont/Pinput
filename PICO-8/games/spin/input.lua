@@ -21,6 +21,33 @@ end
 -- compatibility input modes
 -- for when you're not cool enough to have Pinput installed
 
+cartdata_input_mode_index = 1
+
+-- explain how to use this game
+function input_draw_instructions()
+ cls()
+ print("waiting for pINPUT connection...")
+ print("")
+ print("               \f1…\f6")
+ print("")
+ print("choose another input scheme from")
+ print("the pause menu (\f7p\f6 or \f7enter\f6):")
+ print("")
+ print("\f7devkit\f6: \f7wasd\f6 or \f7arrow keys\f6 move,")
+ print("\f7mouse\f6 aims, \f7spacebar\f6 to bomb")
+ print("")
+ print("\f7p1+p2\f6: \f7p2\f6 \f7⬆️⬇️⬅️➡️\f6 move,")
+ print("       \f7p1\f6 \f7⬆️⬇️⬅️➡️\f6 aim,")
+ print("       \f7🅾️\f6 or \f7❎\f6 to bomb")
+ print("")
+ print("               \f1…\f6")
+ print("")
+ print("or get pINPUT here:")
+ print("\fcgithub.com/VyrCossont/Pinput\f6")
+ print("")
+ print("(press \f7🅾️\f6 or \f7❎\f6 to copy url)")
+end
+
 -- does nothing
 function input_noop()
 end
@@ -65,7 +92,10 @@ function input_init()
  }
 
  -- currently selected mode
- input_mode_index = 1
+ input_mode_index = dget(cartdata_input_mode_index)
+ if input_mode_index == 0 then
+  input_mode_index = 1
+ end
 
  -- functions defined by current input mode
  input_is_inited = nil
@@ -103,6 +133,7 @@ function input_change_mode(new_input_mode_index)
  input_is_connected = mode.is_connected
  input_stick = mode.stick
  input_trigger = mode.trigger
+ dset(cartdata_input_mode_index, input_mode_index)
 end
 
 -- devkit mode: mouse and keyboard

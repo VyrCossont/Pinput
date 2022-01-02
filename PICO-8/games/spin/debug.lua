@@ -1,8 +1,10 @@
 -- debugging functions
 
+cartdata_overlay_enabled = 2
+
 function overlay_init()
 -- render debug overlay and profiling HUD
- overlay_enabled = true
+ overlay_enabled = dget(cartdata_overlay_enabled) == 0
  overlay_menuitem()
 end
 
@@ -10,8 +12,10 @@ function overlay_menuitem()
  overlay_enabled = not overlay_enabled
  if overlay_enabled then
   menuitem(2, "◆ debug overlay", overlay_menuitem)
+  dset(cartdata_overlay_enabled, 1)
  else
   menuitem(2, "○  debug overlay", overlay_menuitem)
+  dset(cartdata_overlay_enabled, 0)
  end
  return true
 end

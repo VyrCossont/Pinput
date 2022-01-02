@@ -9,27 +9,7 @@ cpu_draw = 0
 
 function _draw()
  if record_replay == nil and not input_is_inited() then
-  cls()
-  print("waiting for pINPUT connection...")
-  print("")
-  print("               \f1…\f6")
-  print("")
-  print("choose another input scheme from")
-  print("the pause menu (p or enter)")
-  print("")
-  print("devkit: wasd moves, mouse aims")
-  print("        space to bomb")
-  print("")
-  print("p1+p2: p2 d-pad moves, p1 aims")
-  print("       any button to bomb")
-  print("")
-  print("               \f1…\f6")
-  print("")
-  print("or get pINPUT here:")
-  print("")
-  print("\fcgithub.com/VyrCossont/Pinput\f6")
-  print("")
-  print("(press 🅾️ or ❎ to copy url)")
+  input_draw_instructions()
   return
  elseif record_replay == nil and not input_is_connected() then
   cls()
@@ -66,41 +46,41 @@ end
 
 -- todo: reuse/extract format functions
 
--- always 3 chars wide
+-- always 6 drawn chars wide
 function hud_lives_text()
  if num_lives > 3 then
-  return " " .. num_lives .. glyph_claw
+  return "    " .. num_lives .. glyph_claw
  else
   local s = ""
   for _ = 1, num_lives do
    s = glyph_claw .. s
   end
-  while #s < 3 do
+  for _ = 1, 6 - (num_lives * 2) do
    s = " " .. s
   end
   return s
  end
 end
 
--- always 3 chars wide
+-- always 6 drawn chars wide
 function hud_bombs_text()
  if num_bombs > 3 then
-  return glyph_bomb .. num_bombs .. " "
+  return glyph_bomb .. num_bombs .. "    "
  else
   local s = ""
   for _ = 1, num_bombs do
    s = s .. glyph_bomb
   end
-  while #s < 3 do
+  for _ = 1, 6 - (num_bombs * 2) do
    s = s .. " "
   end
   return s
  end
 end
 
--- always 9 chars wide
-function hud_score_text()
- local s = tostr(score, 2)
+-- x: 32-bit integer
+function format_with_commas(x)
+ local s = tostr(x, 2)
  local chunks = {}
  for i = #s, 1, -3 do
   add(
@@ -112,6 +92,12 @@ function hud_score_text()
  for i = 2, #chunks do
   s = s .. "," .. chunks[i]
  end
+ return s
+end
+
+-- always 9 chars wide
+function hud_score_text()
+ local s = format_with_commas(score)
  while #s < 9 do
   s = s .. " "
  end
@@ -120,8 +106,11 @@ end
 
 -- always 9 chars wide
 function hud_highscore_text()
- -- todo: store high score in cartdata
- return "9,999,999"
+ local s = format_with_commas(highscore)
+ while #s < 9 do
+  s = " " .. s
+ end
+ return s
 end
 
 function draw()
