@@ -51,6 +51,21 @@ function update60()
   particle.dy = particle.dy * 0.9
  end
 
+ if waiting_to_start then
+  if input_button(pi_a) then
+   waiting_to_start = false
+   -- todo: hack for not having btnp() equivalent in Pinput
+   -- todo: and for buttons and triggers overlapping in some input schemes
+   bomb_ready = false
+  else
+   waiting_to_start_blink = waiting_to_start_blink - 1
+   if waiting_to_start_blink <= -waiting_to_start_interval then
+    waiting_to_start_blink = waiting_to_start_interval
+   end
+   return
+  end
+ end
+
  if display_dead > 0 then
   display_dead = display_dead - 1
   return

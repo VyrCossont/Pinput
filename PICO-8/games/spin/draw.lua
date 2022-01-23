@@ -142,8 +142,16 @@ function draw()
   )
  end
 
+ if waiting_to_start then
+  camera()
+  if waiting_to_start_blink >= 0 then
+   -- todo: customize prompt for each input system
+   print("press 🅾️ to start", 30, 62, 15)
+  end
+  return
+ end
+
  if display_dead > 0 then
-  spr(16, -4, -4)
   return
  end
 

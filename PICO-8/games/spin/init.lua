@@ -15,11 +15,13 @@ end
 function restart_init()
  record_init()
  world_init()
- enemy_init()
  spawn_init()
 end
 
 function world_init()
+ waiting_to_start = true
+ waiting_to_start_interval = 45
+ waiting_to_start_blink = waiting_to_start_interval
  world_r = 128
  display_dead = 0
  particles = {}
@@ -40,6 +42,8 @@ function world_init()
 end
 
 function per_life_init()
+ enemy_init()
+
  ship = {
   x = 0,
   y = 0,
@@ -61,8 +65,9 @@ function per_life_init()
  kills = 0
 end
 
--- todo: move this
-function kill_ship()
+-- todo: move these
+
+function end_run()
  -- save high score
  if score > highscore then
   highscore = score
@@ -71,10 +76,9 @@ function kill_ship()
 
  -- restart game
  restart_init()
+end
 
- -- mark player as dead for a second
- display_dead = 60
-
+function kill_ship()
  -- particle blast from ship
  for _ = 1, 16 do
   add(particles, {
@@ -84,5 +88,16 @@ function kill_ship()
    dy = rnd(5) - 2.5,
    color = 10,
   })
+ end
+
+ if num_lives == 1 then
+  end_run()
+ else
+  num_lives = num_lives - 1
+
+  -- mark player as dead for a second
+  display_dead = 60
+
+  per_life_init()
  end
 end

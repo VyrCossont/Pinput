@@ -69,6 +69,7 @@ function input_init()
    deinit = input_noop,
    stick = pi_stick,
    trigger = pi_trigger,
+   button = pi_button,
   },
   {
    name = "devkit",
@@ -78,6 +79,7 @@ function input_init()
    deinit = devkit_deinit,
    stick = devkit_pi_stick,
    trigger = devkit_pi_trigger,
+   button = devkit_pi_button,
   },
   {
    name = "p1+p2",
@@ -87,6 +89,7 @@ function input_init()
    deinit = input_noop,
    stick = p1p2_pi_stick,
    trigger = p1p2_pi_trigger,
+   button = p1p2_pi_button,
   },
   -- todo: add recording playback
  }
@@ -102,6 +105,7 @@ function input_init()
  input_is_connected = nil
  input_stick = nil
  input_trigger = nil
+ input_button = nil
 
  input_change_mode(input_mode_index)
 end
@@ -133,6 +137,7 @@ function input_change_mode(new_input_mode_index)
  input_is_connected = mode.is_connected
  input_stick = mode.stick
  input_trigger = mode.trigger
+ input_button = mode.button
  dset(cartdata_input_mode_index, input_mode_index)
 end
 
@@ -190,6 +195,13 @@ function devkit_pi_trigger()
  end
 end
 
+-- z and x are 🅾️ and ❎ (Pinput a and b)
+-- good enough for menus
+function devkit_pi_button(b)
+ return (b == pi_a and stat(28, 29))
+  or (b == pi_b and stat(28, 27))
+end
+
 -- p1 + p2 mode: use two gamepads
 -- (or more likely, two sets of keyboard controls)
 
@@ -222,4 +234,10 @@ function p1p2_pi_trigger(t)
  else
   return 0
  end
+end
+
+-- pass thru 🅾️ and ❎ buttons from both players
+-- conflicts with trigger but these should only be used in menus
+function p1p2_pi_button(b)
+ return btn(b - 8, 0) or btn(b - 8, 1)
 end
