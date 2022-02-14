@@ -125,6 +125,7 @@ function update60()
     dx = rx * 3 + lx,
     dy = ry * 3 + ly,
    })
+   sfx(0)
    fire_counter = fire_cooldown
   end
  else
