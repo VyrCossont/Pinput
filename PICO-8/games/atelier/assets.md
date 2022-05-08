@@ -3,6 +3,9 @@
 - [8x8_cc0_oga-by_roguelike](https://opengameart.org/content/8x8cc0oga-byroguelike)
 - [LPC tag](https://opengameart.org/art-search-advanced?field_art_tags_tid=LPC)
 - [JosephSeraph's Resources](https://lightningseraph.tumblr.com/) (the "JS" from OGA)
+- [16x16 Emotes for RPGs and Digital Pets](https://opengameart.org/content/16x16-emotes-for-rpgs-and-digital-pets)
+- [OGA 16x16 JRPG Sprites & Tiles](https://opengameart.org/content/oga-16x16-jrpg-sprites-tiles)
+- [Jason-Em's (aka GrafxKid) Classic Hero Edits](https://opengameart.org/content/jason-ems-aka-grafxkid-classic-hero-edits)
 
 ## tiles
 
@@ -19,6 +22,7 @@
 - [Blowhard 2: Blow Harder](https://opengameart.org/content/blowhard-2-blow-harder)
 - [Flowers](https://opengameart.org/content/flowers)
 - [RogueLite](https://opengameart.org/content/roguelite)
+- [8bit Overworld Tileset](https://itchabop.itch.io/8bit-overworld-tileset) (16x16) (licensed for free and commercial projects)
 
 ### 4-color tiles
 
@@ -26,6 +30,13 @@
 - [4 Colour Dungeon Tileset](https://opengameart.org/content/4-colour-dungeon-tileset)
 - [4 Colour Interior Tileset](https://opengameart.org/content/4-colour-interior-tileset)
 - [Blowhard 2: Blow Harder](https://opengameart.org/content/blowhard-2-blow-harder)
+- [DUNGEON \[NEW COLORS\]](https://teaceratops.itch.io/farmtiles) (CC BY 4.0)
+- [GB Style Farm and Town Tileset](https://teaceratops.itch.io/farmtiles) (licensed for commercial and academic projects)
+
+### 2-color tiles
+
+- [https://ledoux.itch.io/forest-zone-bitsy-tile-pack](https://ledoux.itch.io/forest-zone-bitsy-tile-pack) (licensed for free and commercial projects)
+- [1-bit tileset 8*8px (Pulp compatible)](https://teaceratops.itch.io/1-bit-tileset) (licensed for commercial and academic projects)
 
 ## sprites
 
