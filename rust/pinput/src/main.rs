@@ -10,17 +10,17 @@ use chrono::Duration;
 use process_memory::Memory;
 
 mod error;
-mod pico8_connection;
+mod runtime_connection;
 mod constants;
 mod gamepad;
 
 use crate::error::Error;
 use crate::constants::{FRAME_DURATION_MS, SCAN_INTERVAL_MS, PINPUT_MAGIC, PINPUT_MAX_GAMEPADS};
-use crate::pico8_connection::Pico8Connection;
+use crate::runtime_connection::RuntimeConnection;
 use crate::gamepad::{sync_gamepad, PinputGamepadArray, SdlGamepad};
 
-/// Look for PICO-8 with Pinput magic until we either find it or are killed.
-fn scan_for_pico8_connection(keep_going: Arc<AtomicBool>) -> Result<Pico8Connection, Error> {
+/// Look for a runtime with Pinput magic until we either find it or are killed.
+fn scan_for_runtime_connection(keep_going: Arc<AtomicBool>) -> Result<RuntimeConnection, Error> {
     let (timer_tx, timer_rx) = channel();
     let timer = Timer::new();
     let _timer_guard = Some(timer.schedule_repeating(
@@ -30,20 +30,20 @@ fn scan_for_pico8_connection(keep_going: Arc<AtomicBool>) -> Result<Pico8Connect
     ));
     while keep_going.load(Ordering::Relaxed) {
         timer_rx.recv()?;
-        match Pico8Connection::try_new() {
-            Ok(pico8_connection) => return Ok(pico8_connection),
-            Err(err) => println!("Failed to connect to PICO-8: {:#?}", err),
+        match RuntimeConnection::try_new() {
+            Ok(runtime_connection) => return Ok(runtime_connection),
+            Err(err) => println!("Failed to connect to a runtime: {:#?}", err),
         }
     }
     Err(Error::KilledByCtrlC)
 }
 
-/// Sync SDL gamepads with PICO-8 until PICO-8 quits or we are killed.
+/// Sync SDL gamepads with the runtime until the runtime quits or we are killed.
 fn run_gamepad_loop(
     keep_going: Arc<AtomicBool>,
     joystick_subsystem: JoystickSubsystem,
     game_controller_subsystem: GameControllerSubsystem,
-    pico8_connection: Pico8Connection,
+    runtime_connection: RuntimeConnection,
 ) -> Result<(), Error> {
 let (timer_tx, timer_rx) = channel();
     let timer = Timer::new();
@@ -62,22 +62,22 @@ let (timer_tx, timer_rx) = channel();
         // We could also run the SDL event loop, which would call this automatically.
         game_controller_subsystem.update();
 
-        let magic = match pico8_connection.gpio_as_uuid.read() {
+        let magic = match runtime_connection.gpio_as_uuid.read() {
             Ok(magic) => magic,
             Err(err) => {
-                // Failure here probably indicates that PICO-8 quit.
-                println!("Failed to read from PICO-8: {:#}", err);
+                // Failure here probably indicates that the runtime quit.
+                println!("Failed to read from {}: {:#}", runtime_connection.flavor, err);
                 return Ok(())
             },
         };
         if magic == PINPUT_MAGIC {
             gamepads = PinputGamepadArray::default();
         } else {
-            gamepads = match pico8_connection.gpio_as_gamepads.read() {
+            gamepads = match runtime_connection.gpio_as_gamepads.read() {
                 Ok(gamepads) => gamepads,
                 Err(err) => {
-                    // Failure here probably indicates that PICO-8 quit.
-                    println!("Failed to read from PICO-8: {:#}", err);
+                    // Failure here probably indicates that the runtime quit.
+                    println!("Failed to read from {}: {:#}", runtime_connection.flavor, err);
                     return Ok(())
                 },
             }
@@ -115,11 +115,11 @@ let (timer_tx, timer_rx) = channel();
             }
         }
 
-        match pico8_connection.gpio_as_gamepads.write(&gamepads) {
+        match runtime_connection.gpio_as_gamepads.write(&gamepads) {
             Ok(_) => (),
             Err(err) => {
-                // Failure here probably indicates that PICO-8 quit.
-                println!("Failed to write from PICO-8: {:#}", err);
+                // Failure here probably indicates that the runtime quit.
+                println!("Failed to write from {}: {:#}", runtime_connection.flavor, err);
                 return Ok(())
             },
         }
@@ -146,15 +146,15 @@ fn main() -> Result<(), Error> {
 
     // TODO: treat `KilledByCtrlC` as a normal exit.
     loop {
-        let pico8_connection = scan_for_pico8_connection(
+        let runtime_connection = scan_for_runtime_connection(
             keep_going.clone()
         )?;
-        println!("connected: PID {}", pico8_connection.pid);
+        println!("connected: {}, PID {}", runtime_connection.flavor, runtime_connection.pid);
         run_gamepad_loop(
             keep_going.clone(),
             joystick_subsystem.clone(),
             game_controller_subsystem.clone(),
-            pico8_connection,
+            runtime_connection,
         )?;
     }
 }
