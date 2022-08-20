@@ -22,3 +22,5 @@
 /web/extension/logo-*.png
 
 /release/artifacts/*
+
+/WASM-4/pinput_tester/target
