@@ -26,14 +26,15 @@ fn draw_dpad(gp: PinputGamepad) {
     let x: i32 = 40;
     let y: i32 = 120;
     let d: i32 = 10;
+    // `{gp.buttons}` removes a soon-to-be-illegal unaligned access to a packed struct field.
     // left
-    draw_dpad_btn(b"\x84", x - d, y, gp.buttons.contains(PinputGamepadButtons::DPAD_LEFT));
+    draw_dpad_btn(b"\x84", x - d, y, {gp.buttons}.contains(PinputGamepadButtons::DPAD_LEFT));
     // right
-    draw_dpad_btn(b"\x85", x + d, y, gp.buttons.contains(PinputGamepadButtons::DPAD_RIGHT));
+    draw_dpad_btn(b"\x85", x + d, y, {gp.buttons}.contains(PinputGamepadButtons::DPAD_RIGHT));
     // up
-    draw_dpad_btn(b"\x86", x, y - d, gp.buttons.contains(PinputGamepadButtons::DPAD_UP));
+    draw_dpad_btn(b"\x86", x, y - d, {gp.buttons}.contains(PinputGamepadButtons::DPAD_UP));
     // down
-    draw_dpad_btn(b"\x87", x, y + d, gp.buttons.contains(PinputGamepadButtons::DPAD_DOWN));
+    draw_dpad_btn(b"\x87", x, y + d, {gp.buttons}.contains(PinputGamepadButtons::DPAD_DOWN));
 }
 
 fn draw_action_btn(label: &str, x: i32, y: i32, pressed: bool) {
@@ -55,10 +56,11 @@ fn draw_action_pad(gp: PinputGamepad) {
     let x: i32 = 120;
     let y: i32 = 120;
     let d: i32 = 10;
-    draw_action_btn("X", x - d, y, gp.buttons.contains(PinputGamepadButtons::X));
-    draw_action_btn("B", x + d, y, gp.buttons.contains(PinputGamepadButtons::B));
-    draw_action_btn("Y", x, y - d, gp.buttons.contains(PinputGamepadButtons::Y));
-    draw_action_btn("A", x, y + d, gp.buttons.contains(PinputGamepadButtons::A));
+    // `{gp.buttons}` removes a soon-to-be-illegal unaligned access to a packed struct field.
+    draw_action_btn("X", x - d, y, {gp.buttons}.contains(PinputGamepadButtons::X));
+    draw_action_btn("B", x + d, y, {gp.buttons}.contains(PinputGamepadButtons::B));
+    draw_action_btn("Y", x, y - d, {gp.buttons}.contains(PinputGamepadButtons::Y));
+    draw_action_btn("A", x, y + d, {gp.buttons}.contains(PinputGamepadButtons::A));
 }
 
 fn cls(color: u8) {
