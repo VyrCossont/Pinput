@@ -63,6 +63,25 @@ fn draw_action_pad(gp: PinputGamepad) {
     draw_action_btn("A", x, y + d, {gp.buttons}.contains(PinputGamepadButtons::A));
 }
 
+fn draw_analog_stick(center_x: i32, center_y: i32, stick_x: i16, stick_y: i16) {
+    let big_r: i32 = 20;
+    let small_r: i32 = 5;
+    unsafe { *DRAW_COLORS = 0x20 }
+    oval(center_x - big_r, center_y - big_r, 2 * big_r as u32, 2 * big_r as u32);
+    let thumb_x = ((stick_x as i32) * big_r) / -(i16::MIN as i32);
+    let thumb_y = -((stick_y as i32) * big_r) / -(i16::MIN as i32);
+    unsafe { *DRAW_COLORS = 0x33 }
+    oval(center_x - small_r + thumb_x, center_y - small_r + thumb_y, 2 * small_r as u32, 2 * small_r as u32);
+}
+
+fn draw_analog_sticks(gp: PinputGamepad) {
+    let x: i32 = 80;
+    let y: i32 = 50;
+    let d: i32 = 30;
+    draw_analog_stick(x - d, y, gp.left_stick_x, gp.left_stick_y);
+    draw_analog_stick(x + d, y, gp.right_stick_x, gp.right_stick_y);
+}
+
 fn cls(color: u8) {
     if color == 0 { return }
     let c = color - 1;
@@ -88,7 +107,7 @@ fn update() {
     }
 
     let gp = unsafe { (*PI_GAMEPADS)[0] };
-
+    draw_analog_sticks(gp);
     draw_dpad(gp);
     draw_action_pad(gp);
 }
