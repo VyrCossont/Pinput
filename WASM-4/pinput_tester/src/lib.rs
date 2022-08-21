@@ -237,6 +237,16 @@ const BOLT: [u8; 8] = [
     0b00000000,
 ];
 
+fn div_ceil(a: i32, b: i32) -> i32 {
+    let result = a / b;
+    let remainder = a % b;
+    if remainder == 0 {
+         result
+    } else {
+        result + 1
+    }
+}
+
 fn draw_battery(gp: PinputGamepad) {
     if !{gp.flags}.contains(PinputGamepadFlags::HAS_BATTERY) { return }
 
@@ -250,8 +260,20 @@ fn draw_battery(gp: PinputGamepad) {
         blit(&BOLT, x - 10, y - 3, 8, 8, BLIT_1BPP);
     }
 
-    unsafe { *DRAW_COLORS = 3 }
-    text(format!("{}%", {gp.battery as i32} * 100 / (u8::MAX as i32)), x - 8, y + 6);
+    let max_dots = 3;
+    let num_dots = div_ceil({gp.battery as i32} * max_dots, u8::MAX as i32);
+    let dot_r = 2;
+    let dot_spacing = 2;
+    let dot_dx = (2 * dot_r) + dot_spacing;
+    let first_dot_x = x - (dot_dx * (max_dots - 1)) / 2;
+    for i in 0..max_dots {
+        if i < num_dots {
+            unsafe { *DRAW_COLORS = 0x33 }
+        } else {
+            unsafe { *DRAW_COLORS = 0x22 }
+        }
+        oval(first_dot_x + dot_dx * i - dot_r, y + 3 + dot_r, 2 * dot_r as u32, 2 * dot_r as u32);
+    }
 }
 
 fn cls(color: u8) {
