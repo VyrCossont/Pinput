@@ -1,6 +1,6 @@
 use sysinfo;
 use proc_maps;
-use sysinfo::{AsU32, System, SystemExt, Process, ProcessExt, RefreshKind};
+use sysinfo::{System, SystemExt, PidExt, Process, ProcessExt, ProcessRefreshKind, RefreshKind};
 use std::path::{Path, PathBuf};
 use plist;
 use std::ffi::OsStr;
@@ -167,7 +167,7 @@ impl Pico8Connection {
 
     pub fn try_new() -> Result<Self, Error> {
         let system = System::new_with_specifics(
-            RefreshKind::new().with_processes()
+            RefreshKind::new().with_processes(ProcessRefreshKind::new())
         );
 
         let pico8_pid: Pid = system.processes().iter()
