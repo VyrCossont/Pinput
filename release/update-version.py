@@ -80,7 +80,7 @@ def main():
         f.write(contents)
         f.truncate()
 
-    for manifest_version in ['v2', 'v3']
+    for manifest_version in ['v2', 'v3']:
         with open(base_dir / 'web/extension' / manifest_version / 'manifest.json', 'r+') as f:
             contents = f.read()
             contents = re.sub(
