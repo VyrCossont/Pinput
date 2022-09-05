@@ -135,10 +135,14 @@ fn is_wasm4_process(process: &Process) -> Result<bool, Error> {
     is_wasm4_exe(process.exe())
 }
 
-const WASM4_EXECUTABLE_NAMES: [&str; 3] = [
+const WASM4_EXECUTABLE_NAMES: &[&str] = &[
     "wasm4-mac",
     "wasm4-linux",
     "wasm4-windows.exe",
+    "wasm4",
+    "wasm4.exe",
+    "wasm4_glfw",
+    "wasm4_glfw.exe",
 ];
 
 /// Detect WASM-4 native runtimes.
