@@ -53,6 +53,20 @@ def main():
             f.write(contents)
             f.truncate()
 
+    for filename in ['Cargo.toml', 'Cargo.lock']:
+        with open(base_dir / 'WASM-4/pinput_tester' / filename, 'r+') as f:
+            contents = f.read()
+            contents = re.sub(
+                r'^(name = "pinput_tester"\nversion = ")(\d+\.\d+\.\d+)(")$',
+                fr'\g<1>{vformat(next_version)}\g<3>',
+                contents,
+                count=1,
+                flags=re.MULTILINE
+            )
+            f.seek(0)
+            f.write(contents)
+            f.truncate()
+
     for filename in ['pinput.lua', 'pinput_tester.p8']:
         with open(base_dir / 'PICO-8' / filename, 'r+') as f:
             contents = f.read()

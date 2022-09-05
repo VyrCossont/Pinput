@@ -1,4 +1,4 @@
--- pinput client v0.1.2
+-- pinput client v0.1.3
 -- @vyr@demon.social
 
 -- common

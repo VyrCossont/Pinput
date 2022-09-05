@@ -4,11 +4,13 @@
 
 [//]: # (brew install github-markdown-toc)
 [//]: # (gh-md-toc --hide-header --hide-footer --start-depth 1 --no-escape README.md)
+[//]: # (currently doesn't work; see https://github.com/ekalinin/github-markdown-toc.go/issues/35)
 
 [//]: # (start ToC)
 
 * [Introduction](#introduction)
 * [PICO-8 development](#pico-8-development)
+* [WASM-4 development](#wasm-4-development)
 * [Instructions](#instructions)
   * [Rust](#rust)
   * [macOS](#macos)
@@ -50,6 +52,16 @@ Consult [`pinput_tester.p8`](PICO-8/pinput_tester.p8) (the test cartridge) for m
 
 Note that Pinput doesn't try to suppress PICO-8's own gamepad API, and whatever button PICO-8 uses to open the pause menu will still open the menu. However, you can use the undocumented [`poke(0x5f30, 1)`](https://pico-8.fandom.com/wiki/Memory#Draw_state) trick to suppress the menu yourself.
 
+## WASM-4 development
+
+The Rust builds of Pinput now support the [WASM-4](https://wasm4.org/) fantasy console's native runtimes in addition to PICO-8! WASM-4 gets the exact same capabilities as PICO-8: 8 gamepads, analog sticks, triggers, rumble, the works. WASM-4 web runtimes are not yet supported.
+
+See the releases for a test cartridge named `pinput_tester-….wasm`.
+
+Check out [`gamepad.rs` in the WASM-4 Pinput tester cartridge source](WASM-4/pinput_tester/src/gamepad.rs) for Rust structs that describe the in-memory layout of the Pinput gamepads, as well as implementations of `pi_init` and `pi_is_inited`.
+
+The WASM-4 Pinput tester currently uses the 128-byte reserved area starting at `0x0020` for communication with Pinput, because the only thing that uses that area is netplay. Pinput would break netplay by providing an alternate input method that isn't integrated with netcode (much like how you can't use the mouse in a WASM-4 netplay cartridge), and the native runtimes for WASM-4 don't support netplay yet anyway, so there's no conflict. However, you can use _any_ 128-byte area of memory to communicate with Pinput, simply by placing the Pinput magic bytes at the start of it.
+
 ## Instructions
 
 ![The pinput_tester.p8 PICO-8 cartridge.](PICO-8/pinput_tester.p8.png)
@@ -64,13 +76,13 @@ Once both the app and the cartridge are running, the cartridge should switch fro
 
 ### Rust
 
-The Rust + SDL version of Pinput (`pinput-rust-….zip`) is the newest and best for most users. It uses the same codebase on macOS, Windows, and Linux. Download and unzip the appropriate version for your system and processor to get an app called `pinput` or `pinput.exe`, which you can run from your terminal.
+The Rust + SDL version of Pinput (`pinput-rust-….zip`) is the newest and best for most users, and supports both PICO-8 and WASM-4. It uses the same codebase on macOS, Windows, and Linux. Download and unzip the appropriate version for your system and processor to get an app called `pinput` or `pinput.exe`, which you can run from your terminal.
 
 - Linux users: you will need to run `sudo setcap cap_sys_ptrace+ep pinput` before trying to run `pinput` for the first time; this grants the `pinput` executable the ability to read and write PICO-8 memory using `ptrace()`.
 - macOS users: you will see a permissions dialog the first time you run it (see below).
 - Windows users: you don't need to do anything special. `pinput.exe` should just work.
 
-On starting Pinput, it will print `Failed to connect to PICO-8: NoPico8ProcessesFound` every second until it detects a running PICO-8 cartridge with Pinput support, at which point it will print a message like `connected: PID 18649`. It may also print diagnostic messages like `PS4 Controller doesn't support rumble.` depending on your OS and gamepad.
+On starting Pinput, it will print `Failed to connect to a runtime: NoProcessesFound` every second until it detects a running PICO-8 or WASM-4 cartridge with Pinput support, at which point it will print a message like `connected: PICO-8, PID 18649`. It may also print diagnostic messages like `PS4 Controller doesn't support rumble.` depending on your OS and gamepad.
 
 Press Ctrl-C to exit when you're done.
 
@@ -119,19 +131,25 @@ Supports reading all buttons, sticks, triggers, and the battery level, plus acti
 
 Note that as of the current version, rumble does not work with DualShock or Xbox Bluetooth gamepads on macOS. You'll need to use the macOS GUI version for that. This may be fixed in future versions.
 
+Supports PICO-8 and WASM-4.
+
 ### macOS
 
 Supports reading all buttons, sticks, triggers, and the battery level and charging status, plus activating rumble, from up to 8 controllers.
 
-The current implementation has been tested with macOS 11.6 on Intel hardware only, but targets a minimum macOS version of 11.1. Please let me know if you get this running on Apple Silicon.
+The current implementation has been tested with macOS 11.6 and 12.5 on Intel hardware only, but targets a minimum macOS version of 11.1. Please let me know if you get this running on Apple Silicon.
 
 Controller-wise, I've tested it with an Xbox Wireless Controller with Bluetooth (model 1708) and a DualShock 4 (model CUH-ZCT2), but it should work with any controller supported by Apple's Game Controller API. (Check [Apple's pairing instructions](https://support.apple.com/en-us/HT210414) if you get stuck.) Note that this does _not_ include vanilla USB or Bluetooth HID gamepads, or classic XInput devices like 360 gamepads.
+
+Supports PICO-8 only.
 
 ### Windows
 
 Supports reading all buttons, sticks, triggers, and the battery level, plus activating rumble, from up to 4 XInput controllers. Non-XInput controllers are not supported.
 
 The current implementation has been tested on Windows 10 Build 19042 and an x64 (aka x86_64 or amd64) machine, with both the x86 and x64 release builds of the Pinput console app. It may or may not run on older versions of Windows. It doesn't use anything newer than Vista's version of XInput, so it should be portable to older versions, but I don't have any older machines to test on.
+
+Supports PICO-8 only.
 
 ### web
 
@@ -143,6 +161,8 @@ The DualShock 4 (model CUH-ZCT2) does work correctly in Firefox, Chrome, and Saf
 
 The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for macOS. It does not work in XInput mode. Note that in DirectInput mode, the triggers act as digital buttons (reporting either min or max values) and the guide button is inaccessible. Additionally, the analog/digital mode switch on the front should be set to analog (light off).
 
+Supports PICO-8 only.
+
 #### web extension
 
 Supports Chrome and Firefox. Not available from their extension sites yet ([Chrome Web Store](https://chrome.google.com/webstore/category/extensions), [Firefox Browser Add-Ons](https://addons.mozilla.org/firefox/extensions/)), and not functional on Safari yet due to [Safari's weird packaging requirements](https://developer.apple.com/documentation/safariservices/safari_web_extensions/running_your_safari_web_extension). Restricted to the Lexaloffle BBS. Otherwise identical to the version of Pinput for exported web cartridges.
@@ -150,12 +170,13 @@ Supports Chrome and Firefox. Not available from their extension sites yet ([Chro
 ## Future goals
 
 - Demo videos
-- Test cartridge that displays all connected controllers, not just the first one
+- Test cartridges that display all connected controllers, not just the first one
 - Raspberry Pi build
 - Pocket CHIP build
 - Support standalone exported cartridges on all platforms (currently macOS only)
 - Launch PICO-8 with a selected cartridge, and quit when it does
 - XInput controller support on macOS
+- WASM-4 web runtime support
 
 ## Development notes
 
@@ -163,6 +184,6 @@ I've been posting notes on this project in [this Mastodon thread](https://demon.
 
 ## Licensing and attributions
 
-The MIT license applies to the Pinput helper apps, demo cartridges, and client code. However, given the prevalence of the [CC4-BY-NC-SA license](https://creativecommons.org/licenses/by-nc-sa/4.0/) [on the PICO-8 BBS](https://www.lexaloffle.com/info.php?page=tos), you may opt to use that for Pinput demo cartridges and client code instead.
+The MIT license applies to the Pinput helper apps, demo cartridges, and client code. However, given the prevalence of the [CC4-BY-NC-SA license](https://creativecommons.org/licenses/by-nc-sa/4.0/) [on the PICO-8 BBS](https://www.lexaloffle.com/info.php?page=tos) and [on the WASM-4 site](https://wasm4.org/docs/guides/distribution#publish-on-wasm4org), you may opt to use that for Pinput demo cartridges and client code instead.
 
 The gamepad logo is derived from [a public domain work by `carlosmtnz` on OpenClipArt](https://demon.social/web/statuses/106893191617500313).
