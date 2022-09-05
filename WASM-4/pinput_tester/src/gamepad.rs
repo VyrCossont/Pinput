@@ -65,12 +65,12 @@ bitflags! {
     }
 }
 
-/// Structure representing a gamepad to PICO-8.
+/// Structure representing a gamepad to the runtime.
 /// Based on <https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad>
 /// and <https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_vibration>
 /// but prefixed with controller flags and a battery meter, and with smaller rumble types to fit
-/// into a convenient size (16 bytes). All fields are written to PICO-8,
-/// except for the rumble fields, which are read from PICO-8.
+/// into a convenient size (16 bytes). All fields are written to the runtime,
+/// except for the rumble fields, which are read from the runtime.
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct PinputGamepad {
@@ -88,9 +88,9 @@ pub struct PinputGamepad {
     pub right_stick_x: i16,
     pub right_stick_y: i16,
 
-    /// Output from PICO-8.
+    /// Output from the runtime.
     pub lo_freq_rumble: u8,
-    /// Output from PICO-8.
+    /// Output from the runtime.
     pub hi_freq_rumble: u8,
 }
 
@@ -104,7 +104,9 @@ const GPIO: *mut [u8; 128] = 0x20 as *mut [u8; 128];
 pub const PI_GAMEPADS: *mut PinputGamepadArray = 0x20 as *mut PinputGamepadArray;
 
 pub fn pi_init() {
-    // Pinput magic is `0x02_20_c7_46_77_ab_44_6e_be_dc_7f_d6_d2_77_98_4d` but we don't want that literally in our constants.
+    // Pinput magic is `0x02_20_c7_46_77_ab_44_6e_be_dc_7f_d6_d2_77_98_4d`
+    // but we don't want that literally in our constants.
+    // (Unless it's guaranteed by WASM + Rust that constants are mapped into non-writable memory?)
     unsafe {
         (*GPIO)[0xf] = 0x4d;
         (*GPIO)[0xe] = 0x98;
@@ -128,20 +130,22 @@ pub fn pi_init() {
 pub fn pi_is_inited() -> bool {
     unsafe {
         (*GPIO)[0xf] != 0x4d
-        && (*GPIO)[0xe] != 0x98
-        && (*GPIO)[0xd] != 0x77
-        && (*GPIO)[0xc] != 0xd2
-        && (*GPIO)[0xb] != 0xd6
-        && (*GPIO)[0xa] != 0x7f
-        && (*GPIO)[0x9] != 0xdc
-        && (*GPIO)[0x8] != 0xbe
-        && (*GPIO)[0x7] != 0x6e
-        && (*GPIO)[0x6] != 0x44
-        && (*GPIO)[0x5] != 0xab
-        && (*GPIO)[0x4] != 0x77
-        && (*GPIO)[0x3] != 0x46
-        && (*GPIO)[0x2] != 0xc7
-        && (*GPIO)[0x1] != 0x20
-        && (*GPIO)[0x0] != 0x02
+        || (*GPIO)[0xe] != 0x98
+        || (*GPIO)[0xd] != 0x77
+        || (*GPIO)[0xc] != 0xd2
+        || (*GPIO)[0xb] != 0xd6
+        || (*GPIO)[0xa] != 0x7f
+        || (*GPIO)[0x9] != 0xdc
+        || (*GPIO)[0x8] != 0xbe
+        || (*GPIO)[0x7] != 0x6e
+        || (*GPIO)[0x6] != 0x44
+        || (*GPIO)[0x5] != 0xab
+        || (*GPIO)[0x4] != 0x77
+        || (*GPIO)[0x3] != 0x46
+        || (*GPIO)[0x2] != 0xc7
+        || (*GPIO)[0x1] != 0x20
+        || (*GPIO)[0x0] != 0x02
     }
 }
+
+// TODO: implement full Pinput API like PICO-8 version

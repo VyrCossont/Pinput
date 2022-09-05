@@ -9,5 +9,5 @@ pub const PINPUT_MAX_GAMEPADS: usize = 8;
 /// 60 Hz.
 pub static FRAME_DURATION_MS: i64 = 16;
 
-/// 1 Hz between attempts to connect to PICO-8.
+/// 1 Hz between attempts to connect to the runtime.
 pub static SCAN_INTERVAL_MS: i64 = 1000;

@@ -10,19 +10,20 @@ use process_memory;
 use process_memory::{DataMember, Pid, ProcessHandle, TryIntoProcessHandle};
 use memchr::memmem;
 use uuid::Uuid;
+use std::fmt::{Display, Formatter};
 
 use super::constants::PINPUT_MAGIC;
 use super::gamepad::PinputGamepadArray;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("no running PICO-8 processes found")]
-    NoPico8ProcessesFound,
+    #[error("no running PICO-8 or WASM-4 processes found")]
+    NoProcessesFound,
 
-    #[error("Pinput magic bytes not found in PICO-8 process (PID {0})")]
+    #[error("Pinput magic bytes not found in process (PID {0})")]
     PinputNotEnabled(Pid),
 
-    #[error("Pinput magic bytes not found in a PICO-8 process memory region")]
+    #[error("Pinput magic bytes not found in any process memory region")]
     PinputMagicNotFound,
 
     #[error("couldn't find app bundle containing {path}")]
@@ -130,6 +131,34 @@ fn is_pico8_data_segment(map: &MapRange) -> Result<bool, Error> {
     Ok(map_permissions_rw_only && map.filename().is_none())
 }
 
+fn is_wasm4_process(process: &Process) -> Result<bool, Error> {
+    is_wasm4_exe(process.exe())
+}
+
+const WASM4_EXECUTABLE_NAMES: [&str; 3] = [
+    "wasm4-mac",
+    "wasm4-linux",
+    "wasm4-windows.exe",
+];
+
+/// Detect WASM-4 native runtimes.
+/// Not the `w4` binary, but one of the platform-specific ones packed inside it:
+/// https://github.com/aduros/wasm4/blob/main/cli/lib/run-native.js
+fn is_wasm4_exe(path: &Path) -> Result<bool, Error> {
+    if let Some(file_name) = path.file_name() {
+        Ok(WASM4_EXECUTABLE_NAMES.contains(&file_name.to_string_lossy().as_ref()))
+    } else {
+        Ok(false)
+    }
+}
+
+/// WASM-4 cartridge memory is always in an anonymous mapping.
+/// TODO: confirm on Windows, Linux
+fn is_wasm4_data_segment(map: &MapRange) -> Result<bool, Error> {
+    let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
+    Ok(map_permissions_rw_only && map.filename().is_none())
+}
+
 /// Return offset of Pinput magic from memory region's base.
 fn find_pinput_magic(handle: &ProcessHandle, map: &MapRange) -> Result<usize, Error> {
     let data = process_memory::copy_address(
@@ -141,25 +170,45 @@ fn find_pinput_magic(handle: &ProcessHandle, map: &MapRange) -> Result<usize, Er
         .ok_or(Error::PinputMagicNotFound)
 }
 
-/// Encapsulates a connection to a PICO-8 process.
 #[derive(Debug)]
-pub struct Pico8Connection {
+pub enum RuntimeFlavor {
+    Pico8,
+    Wasm4,
+}
+
+impl Display for RuntimeFlavor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let name = match &self {
+            RuntimeFlavor::Pico8 => "PICO-8",
+            RuntimeFlavor::Wasm4 => "WASM-4",
+        };
+        f.write_str(name)
+    }
+}
+
+/// Encapsulates a connection to a PICO-8 or WASM-4 process.
+#[derive(Debug)]
+pub struct RuntimeConnection {
     /// The PID is just for display right now.
     pub pid: Pid,
+    /// Also just for display right now.
+    pub flavor: RuntimeFlavor,
     /// First 16 bytes of GPIO mapped as a UUID.
     pub gpio_as_uuid: DataMember<Uuid>,
     /// All 128 bytes of GPIO mapped as an array of gamepads.
     pub gpio_as_gamepads: DataMember<PinputGamepadArray>,
 }
 
-impl Pico8Connection {
+impl RuntimeConnection {
     pub fn new(
         pid: Pid,
+        flavor: RuntimeFlavor,
         handle: ProcessHandle,
         gpio_address: usize,
-    ) -> Pico8Connection {
-        Pico8Connection{
+    ) -> RuntimeConnection {
+        RuntimeConnection {
             pid,
+            flavor,
             gpio_as_uuid: DataMember::new_offset(handle, vec![gpio_address]),
             gpio_as_gamepads: DataMember::new_offset(handle, vec![gpio_address]),
         }
@@ -170,32 +219,42 @@ impl Pico8Connection {
             RefreshKind::new().with_processes(ProcessRefreshKind::new())
         );
 
-        let pico8_pid: Pid = system.processes().iter()
-            .filter(|(_, process)| is_pico8_process(process).unwrap_or(false))
-            .next()
-            .ok_or(Error::NoPico8ProcessesFound)?
-            .0
-            .as_u32()
-            as Pid;
-        let pico8_handle = pico8_pid.try_into_process_handle()?;
+        let (runtime_pid, runtime_flavor) = system.processes().iter()
+            .find_map(|(process_id, process)| {
+                let pid = process_id.as_u32() as Pid;
+                if is_pico8_process(process).unwrap_or(false) {
+                    Some((pid, RuntimeFlavor::Pico8))
+                } else if is_wasm4_process(process).unwrap_or(false) {
+                    Some((pid, RuntimeFlavor::Wasm4))
+                } else {
+                    None
+                }
+            })
+            .ok_or(Error::NoProcessesFound)?;
+        let runtime_handle = runtime_pid.try_into_process_handle()?;
 
         // TODO: need to be root or in an entitled binary to do this on macOS
         // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
         // TODO: need `setcap cap_sys_ptrace=eip pinput` to do this on Linux
-        let gpio_address = proc_maps::get_process_maps(pico8_pid)?.into_iter()
-            .filter(|map| is_pico8_data_segment(map).unwrap_or(false))
-            .flat_map(|map| {
+        let gpio_address = proc_maps::get_process_maps(runtime_pid)?.into_iter()
+            .filter(|map| {
+                match runtime_flavor {
+                    RuntimeFlavor::Pico8 => is_pico8_data_segment(map),
+                    RuntimeFlavor::Wasm4 => is_wasm4_data_segment(map),
+                }.unwrap_or(false)
+            })
+            .find_map(|map| {
                 // TODO: some permission errors should probably break out of this,
                 //  since that might mean we don't have the right entitlement or capability.
-                let offset = find_pinput_magic(&pico8_handle, &map).ok()?;
+                let offset = find_pinput_magic(&runtime_handle, &map).ok()?;
                 Some(map.start() + offset)
             })
-            .next()
-            .ok_or(Error::PinputNotEnabled(pico8_pid))?;
+            .ok_or(Error::PinputNotEnabled(runtime_pid))?;
 
-        Ok(Pico8Connection::new(
-            pico8_pid,
-            pico8_handle,
+        Ok(RuntimeConnection::new(
+            runtime_pid,
+            runtime_flavor,
+            runtime_handle,
             gpio_address,
         ))
     }

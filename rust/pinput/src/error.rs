@@ -1,4 +1,4 @@
-use crate::pico8_connection;
+use crate::runtime_connection;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -9,7 +9,7 @@ pub enum Error {
     SdlError(#[from] sdl2::IntegerOrSdlError),
 
     #[error("PICO-8 connection error")]
-    Pico8Connection(#[from] pico8_connection::Error),
+    Pico8Connection(#[from] runtime_connection::Error),
 
     #[error("Ctrl-C handler error")]
     CtrlC(#[from] ctrlc::Error),

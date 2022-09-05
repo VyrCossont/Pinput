@@ -107,12 +107,12 @@ impl TryFrom<Button> for PinputGamepadButtons {
     }
 }
 
-/// Structure representing a gamepad to PICO-8.
+/// Structure representing a gamepad to the runtime.
 /// Based on <https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad>
 /// and <https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_vibration>
 /// but prefixed with controller flags and a battery meter, and with smaller rumble types to fit
-/// into a convenient size (16 bytes). All fields are written to PICO-8,
-/// except for the rumble fields, which are read from PICO-8.
+/// into a convenient size (16 bytes). All fields are written to the runtime,
+/// except for the rumble fields, which are read from the runtime.
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct PinputGamepad {
@@ -130,9 +130,9 @@ pub struct PinputGamepad {
     pub right_stick_x: i16,
     pub right_stick_y: i16,
 
-    /// Output from PICO-8.
+    /// Output from the runtime.
     pub lo_freq_rumble: u8,
-    /// Output from PICO-8.
+    /// Output from the runtime.
     pub hi_freq_rumble: u8,
 }
 
