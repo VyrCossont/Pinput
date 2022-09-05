@@ -51,6 +51,9 @@ artifact_path="${release_dir}/artifacts/pinput_tester-${version}.wasm"
 rm -rf "${rust_build_dir}" "${artifact_path}" \
   || true
 
+# Install the WASM target for Rust.
+rustup target add wasm32-unknown-unknown
+
 # Make a release build with Cargo.
 # The WASI target shouldn't include unwanted strings at all,
 # and therefore we don't need to suppress them in the build.
