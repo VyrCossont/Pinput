@@ -8,7 +8,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use timer::Timer;
 use chrono::Duration;
 use process_memory::Memory;
+#[cfg(target_os = "linux")]
 use caps;
+#[cfg(target_os = "linux")]
 use std::env;
 
 mod error;

@@ -23,9 +23,11 @@ pub enum Error {
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
 
+    #[cfg(target_os = "linux")]
     #[error("Missing prerequisites")]
     MissingPrerequisites,
 
+    #[cfg(target_os = "linux")]
     #[error("Capabilities error")]
     CapsError(#[from] caps::errors::CapsError),
 }
