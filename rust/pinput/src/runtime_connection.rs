@@ -109,18 +109,13 @@ fn is_pico8_process(process: &Process) -> Result<bool, Error> {
 
 #[cfg(not(target_os = "linux"))]
 fn is_pico8_data_segment(map: &MapRange) -> Result<bool, Error> {
-    let map_has_expected_permissions = if cfg!(windows) {
-        // The Windows version has one memory map for the whole executable.
-        map.is_read() && map.is_write() && map.is_exec()
-    } else {
-        map.is_read() && map.is_write() && !map.is_exec()
-    };
+    let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
     let map_is_from_pico8_executable = if let Some(path) = map.filename() {
         is_pico8_exe(Path::new(&path))?
     } else {
         false
     };
-    Ok(map_has_expected_permissions && map_is_from_pico8_executable)
+    Ok(map_permissions_rw_only && map_is_from_pico8_executable)
 }
 
 /// On Linux (at least the amd64 version),

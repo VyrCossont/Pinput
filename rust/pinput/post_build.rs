@@ -16,6 +16,7 @@ use {
     std::ptr,
     std::slice,
 
+    windows::core::PWSTR,
     windows::Win32::System::Diagnostics::Debug::{
         CheckSumMappedFile,
         FormatMessageW,
@@ -23,7 +24,7 @@ use {
         FORMAT_MESSAGE_FROM_SYSTEM,
         FORMAT_MESSAGE_IGNORE_INSERTS,
     },
-    windows::Win32::Foundation::{GetLastError, PWSTR},
+    windows::Win32::Foundation::GetLastError,
     windows::Win32::System::SystemServices::{LANG_NEUTRAL, SUBLANG_NEUTRAL},
     windows::Win32::System::Memory::LocalFree,
 };

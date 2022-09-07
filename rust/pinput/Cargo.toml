@@ -29,4 +29,10 @@ proc-maps = { git = "https://github.com/VyrCossont/proc-maps", branch = "windows
 anyhow = "1.0.44"
 memchr = "2.4.1"
 memmap = "0.7.0"
-windows = { version = "0.39.0", features = ["Win32_System_Diagnostics_Debug", "Win32_Foundation", "Win32_System_SystemServices", "Win32_System_Memory"] }
+windows = { version = "0.39.0", features = [
+    "Win32_System_Diagnostics_Debug",
+    "Win32_Foundation",
+    "Win32_System_SystemServices",
+    "Win32_System_Memory",
+    "Win32_System_SystemInformation"
+] }
