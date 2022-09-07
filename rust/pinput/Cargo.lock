@@ -498,8 +498,7 @@ dependencies = [
 [[package]]
 name = "proc-maps"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2f62c16ccc63ce2f590b17b8b9b33616f59631b8982ad52ed21e7f6d936c409"
+source = "git+https://github.com/VyrCossont/proc-maps?branch=windows-use-VirtualQueryEx#69930198c730416716a1fbe01ae101308bd9e27b"
 dependencies = [
  "anyhow",
  "bindgen",

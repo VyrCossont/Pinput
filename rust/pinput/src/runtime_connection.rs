@@ -156,11 +156,11 @@ fn is_wasm4_exe(path: &Path) -> Result<bool, Error> {
     }
 }
 
-/// WASM-4 cartridge memory is always in an anonymous mapping.
-/// TODO: confirm on Windows, Linux
+/// WASM-4 cartridge memory is in an anonymous mapping on macOS and Windows,
+/// but not Linux. Looking for read-write only regions is probably enough filtering.
 fn is_wasm4_data_segment(map: &MapRange) -> Result<bool, Error> {
     let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
-    Ok(map_permissions_rw_only && map.filename().is_none())
+    Ok(map_permissions_rw_only)
 }
 
 /// Return offset of Pinput magic from memory region's base.
