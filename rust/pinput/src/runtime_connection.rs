@@ -156,11 +156,25 @@ fn is_wasm4_exe(path: &Path) -> Result<bool, Error> {
     }
 }
 
-/// WASM-4 cartridge memory is in an anonymous mapping on macOS and Windows,
-/// but not Linux. Looking for read-write only regions is probably enough filtering.
+/// WASM-4 cartridge memory is in an anonymous mapping on macOS and Windows.
+#[cfg(not(target_os = "linux"))]
 fn is_wasm4_data_segment(map: &MapRange) -> Result<bool, Error> {
     let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
-    Ok(map_permissions_rw_only)
+    Ok(map_permissions_rw_only && map.filename().is_none())
+}
+
+/// WASM-4 cartridge memory is in an anonymous mapping on Linux too,
+/// but it gets reported as being in the file "[heap]", which appears to be a procfs quirk:
+/// https://github.com/rbspy/proc-maps/blob/1acf96a/src/linux_maps.rs#L123
+#[cfg(target_os = "linux")]
+fn is_wasm4_data_segment(map: &MapRange) -> Result<bool, Error> {
+    let map_permissions_rw_only = map.is_read() && map.is_write() && !map.is_exec();
+    let map_is_anonymous_or_heap = match map.filename() {
+        None => true,
+        Some(x) if x.to_string_lossy() == "[heap]" => true,
+        _ => false,
+    };
+    Ok(map_permissions_rw_only && map_is_anonymous_or_heap)
 }
 
 /// Return offset of Pinput magic from memory region's base.
@@ -237,9 +251,6 @@ impl RuntimeConnection {
             .ok_or(Error::NoProcessesFound)?;
         let runtime_handle = runtime_pid.try_into_process_handle()?;
 
-        // TODO: need to be root or in an entitled binary to do this on macOS
-        // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
-        // TODO: need `setcap cap_sys_ptrace=eip pinput` to do this on Linux
         let gpio_address = proc_maps::get_process_maps(runtime_pid)?.into_iter()
             .filter(|map| {
                 match runtime_flavor {

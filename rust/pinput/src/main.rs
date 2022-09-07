@@ -8,6 +8,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use timer::Timer;
 use chrono::Duration;
 use process_memory::Memory;
+use caps;
+use std::env;
 
 mod error;
 mod runtime_connection;
@@ -127,7 +129,36 @@ let (timer_tx, timer_rx) = channel();
     Err(Error::KilledByCtrlC)
 }
 
+#[cfg(target_os = "linux")]
+fn check_prerequisites() -> Result<(), Error> {
+    if caps::has_cap(None, caps::CapSet::Effective, caps::Capability::CAP_SYS_PTRACE)? {
+        Ok(())
+    } else {
+        eprintln!("Pinput is missing the CAP_SYS_PTRACE capability!");
+        eprintln!(
+            "Please run this command and restart Pinput: sudo setcap cap_sys_ptrace+ep {}",
+            env::current_exe()?.to_string_lossy()
+        );
+        Err(Error::MissingPrerequisites)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn check_prerequisites() -> Result<(), Error> {
+    // TODO: need to be root or in an entitled binary to do this on macOS
+    // https://dev.to/jasonelwood/setup-gdb-on-macos-in-2020-489k
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn check_prerequisites() -> Result<(), Error> {
+    Ok(())
+}
+
+
 fn main() -> Result<(), Error> {
+    check_prerequisites()?;
+
     let keep_going = Arc::new(AtomicBool::new(true));
     let keep_going_ctrlc = keep_going.clone();
     ctrlc::set_handler(move || keep_going_ctrlc.store(false, Ordering::Relaxed))?;

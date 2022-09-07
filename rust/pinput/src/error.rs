@@ -8,8 +8,8 @@ pub enum Error {
     #[error("SDL error: {0}")]
     SdlError(#[from] sdl2::IntegerOrSdlError),
 
-    #[error("PICO-8 connection error")]
-    Pico8Connection(#[from] runtime_connection::Error),
+    #[error("Runtime connection error")]
+    RuntimeConnection(#[from] runtime_connection::Error),
 
     #[error("Ctrl-C handler error")]
     CtrlC(#[from] ctrlc::Error),
@@ -17,9 +17,15 @@ pub enum Error {
     #[error("Killed by Ctrl-C")]
     KilledByCtrlC,
 
-    #[error("channel error")]
+    #[error("Channel error")]
     RecvError(#[from] std::sync::mpsc::RecvError),
 
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
+
+    #[error("Missing prerequisites")]
+    MissingPrerequisites,
+
+    #[error("Capabilities error")]
+    CapsError(#[from] caps::errors::CapsError),
 }
