@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 34
 __lua__
 -- Geometry Wars demake
--- @VyrCossont
+-- @vyr@demon.social
 
 #include ../pinput.lua
 #include spin/math.lua
