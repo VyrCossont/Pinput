@@ -129,7 +129,7 @@ function load_paths_from_cartdata()
 end
 
 function _init()
- cartdata("vyr_cossont_shape_editor")
+ cartdata("vyrcossont_shape_editor")
  grid_init()
 end
 
