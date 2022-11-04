@@ -69,7 +69,7 @@ function input_init()
    deinit = input_noop,
    stick = pi_stick,
    trigger = pi_trigger,
-   button = pi_button,
+   button = pi_btn,
   },
   {
    name = "devkit",
