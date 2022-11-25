@@ -30,6 +30,9 @@ bitflags! {
 
         /// Does this controller support vibration?
         const HAS_RUMBLE = 1 << 5;
+
+        /// Is this gamepad actually a haptic device?
+        const HAPTIC_DEVICE = 1 << 6;
     }
 }
 

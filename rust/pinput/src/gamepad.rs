@@ -30,6 +30,9 @@ bitflags! {
 
         /// Does this controller support vibration?
         const HAS_RUMBLE = 1 << 5;
+
+        /// Is this gamepad actually a haptic device?
+        const HAPTIC_DEVICE = 1 << 6;
     }
 }
 
@@ -171,13 +174,16 @@ pub struct SdlGamepad {
     pub has_rumble: bool,
 }
 
-pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -> Result<(), Error> {
+pub fn sync_gamepad(
+    sdl_gamepad: &mut SdlGamepad,
+    gamepad: &mut PinputGamepad,
+) -> Result<(), Error> {
     let game_controller = &mut sdl_gamepad.game_controller;
     let joystick = &sdl_gamepad.joystick;
 
     if !game_controller.attached() {
         *gamepad = PinputGamepad::default();
-        return Ok(())
+        return Ok(());
     }
 
     // Set rumble effects, if we can.
@@ -186,7 +192,7 @@ pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -
             ((gamepad.lo_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
             ((gamepad.hi_freq_rumble as f64) / (u8::MAX as f64) * (u16::MAX as f64)) as u16,
             // Setting one frame of rumble leads to choppiness as the effect may expire early.
-            2 * FRAME_DURATION_MS as u32
+            2 * FRAME_DURATION_MS as u32,
         )?;
     }
 
@@ -209,16 +215,16 @@ pub fn sync_gamepad(sdl_gamepad: &mut SdlGamepad, gamepad: &mut PinputGamepad) -
     match power_level {
         PowerLevel::Low => {
             gamepad.battery = u8::MAX / 3;
-        },
+        }
         PowerLevel::Medium => {
             gamepad.battery = u8::MAX / 3 * 2;
-        },
+        }
         PowerLevel::Full => {
             gamepad.battery = u8::MAX;
-        },
+        }
         _ => {
             gamepad.battery = 0;
-        },
+        }
     }
 
     // Read gamepad buttons.
