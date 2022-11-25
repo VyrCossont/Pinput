@@ -30,4 +30,8 @@ pub enum Error {
     #[cfg(target_os = "linux")]
     #[error("Capabilities error")]
     CapsError(#[from] caps::errors::CapsError),
+
+    #[cfg(feature = "haptics")]
+    #[error("Buttplug client error")]
+    ButtplugClientError(#[from] buttplug::client::ButtplugClientError),
 }

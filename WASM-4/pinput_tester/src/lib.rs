@@ -314,4 +314,14 @@ fn update() {
             (*PI_GAMEPADS)[0].hi_freq_rumble = gp.right_trigger;
         }
     }
+
+    for i in 0..PINPUT_MAX_GAMEPADS {
+        unsafe {
+            let flags = (*PI_GAMEPADS)[i].flags;
+            if flags.contains(PinputGamepadFlags::CONNECTED) && flags.contains(PinputGamepadFlags::HAS_RUMBLE) && flags.contains(PinputGamepadFlags::HAPTIC_DEVICE) {
+                (*PI_GAMEPADS)[i].lo_freq_rumble = gp.left_trigger;
+                (*PI_GAMEPADS)[i].hi_freq_rumble = gp.right_trigger;
+            }
+        }
+    }
 }
