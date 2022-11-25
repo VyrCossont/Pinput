@@ -154,7 +154,7 @@ end
 -- flags
 
 pi_flags_offset = 0
-pi_num_flags = 6
+pi_num_flags = 7
 
 pi_connected = 0
 pi_has_battery = 1
@@ -162,6 +162,7 @@ pi_charging = 2
 pi_has_guide_button = 3
 pi_has_misc_button = 4
 pi_has_rumble = 5
+pi_haptic_device = 6
 
 -- read a flag
 function pi_flag(f, pl)

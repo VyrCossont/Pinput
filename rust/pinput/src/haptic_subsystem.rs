@@ -52,17 +52,7 @@ impl HapticSubsystem {
         gamepad.flags.insert(PinputGamepadFlags::CONNECTED);
 
         // Report vibration capability.
-        let num_vibes = haptic_device
-            .device
-            .message_attributes()
-            .scalar_cmd()
-            .as_ref()
-            .map(|cmds| {
-                cmds.iter()
-                    .filter(|cmd| *cmd.actuator_type() == ActuatorType::Vibrate)
-                    .count()
-            })
-            .unwrap_or(0);
+        let num_vibes = haptic_device.device.num_vibration_actuators();
         if num_vibes > 0 {
             gamepad.flags.insert(PinputGamepadFlags::HAS_RUMBLE);
         } else {
@@ -97,7 +87,6 @@ impl HapticSubsystem {
                 [gamepad.lo_freq_rumble, gamepad.hi_freq_rumble]
                     .into_iter()
                     .map(|r| r as f64 / u8::MAX as f64)
-                    .take(num_vibes)
                     .collect(),
             )
         } else {
@@ -121,7 +110,8 @@ where
     while let Some(event) = event_stream.next().await {
         match event {
             ButtplugClientEvent::DeviceAdded(device) => {
-                println!("Buttplug device added: {device:?}");
+                let num_vibes = device.num_vibration_actuators();
+                println!("Buttplug device added: {device:?}, {num_vibes} vibration actuators");
                 if let Ok(mut devices) = devices.lock() {
                     devices.insert(HapticDevice::new(device));
                 } else {
@@ -129,7 +119,7 @@ where
                 }
             }
             ButtplugClientEvent::DeviceRemoved(device) => {
-                println!("Buttplug device added: {device:?}");
+                println!("Buttplug device removed: {device:?}");
                 if let Ok(mut devices) = devices.lock() {
                     devices.remove(&HapticDevice::new(device));
                 } else {
@@ -145,6 +135,25 @@ where
             }
             _ => {}
         }
+    }
+}
+
+/// Convenience methods for Buttplug devices.
+trait ButtplugClientDeviceExt {
+    fn num_vibration_actuators(&self) -> usize;
+}
+
+impl ButtplugClientDeviceExt for ButtplugClientDevice {
+    fn num_vibration_actuators(&self) -> usize {
+        self.message_attributes()
+            .scalar_cmd()
+            .as_ref()
+            .map(|cmds| {
+                cmds.iter()
+                    .filter(|cmd| *cmd.actuator_type() == ActuatorType::Vibrate)
+                    .count()
+            })
+            .unwrap_or(0)
     }
 }
 
