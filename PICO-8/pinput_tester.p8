@@ -240,6 +240,15 @@ function _update60()
  if pi_is_inited() and trigger_rumble then
   pi_rumble(pi_lo, lt, 0)
   pi_rumble(pi_hi, rt, 0)
+
+  for pl = 0, pi_num_players - 1 do
+   if pi_flag(pi_connected, pl)
+     and pi_flag(pi_haptic_device, pl)
+     and pi_flag(pi_has_rumble, pl) then
+      pi_rumble(pi_lo, lt, pl)
+      pi_rumble(pi_hi, rt, pl)
+   end
+  end
  end
  
  lt_dx = lt / (0xff / trigger_width)
