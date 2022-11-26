@@ -6,7 +6,6 @@ use process_memory::Memory;
 use sdl2;
 use sdl2::{GameControllerSubsystem, JoystickSubsystem};
 use std::cmp::min;
-#[cfg(target_os = "linux")]
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
@@ -200,6 +199,34 @@ fn check_prerequisites() -> Result<(), Error> {
 }
 
 fn main() -> Result<(), Error> {
+    // TODO: real command-line parser
+    let args: Vec<String> = env::args().collect();
+    let name = if args.len() == 0 {
+        "pinput".to_owned()
+    } else {
+        args[0].clone()
+    };
+    let mut show_usage = false;
+    let mut haptics_server: Option<String> = None;
+    if !(args.len() == 1 || args.len() == 3)
+        || args.contains(&"-h".to_owned())
+        || args.contains(&"--help".to_owned())
+    {
+        show_usage = true;
+    }
+    for i in 1..args.len() - 1 {
+        if args[i] == "--haptics-server" {
+            haptics_server = Some(args[i + 1].clone());
+        } else {
+            show_usage = true;
+            break;
+        }
+    }
+    if show_usage {
+        println!("usage: {name} [--haptics-server ws://127.0.0.1:12345]");
+        return Ok(());
+    }
+
     check_prerequisites()?;
 
     let keep_going = Arc::new(AtomicBool::new(true));
@@ -218,7 +245,7 @@ fn main() -> Result<(), Error> {
     let game_controller_subsystem = sdl_context
         .game_controller()
         .map_err(|s| Error::SdlStringError(s))?;
-    let haptic_subsystem = HapticSubsystem::new()?;
+    let haptic_subsystem = HapticSubsystem::new(haptics_server)?;
 
     // TODO: treat `KilledByCtrlC` as a normal exit.
     loop {
