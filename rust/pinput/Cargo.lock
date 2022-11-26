@@ -265,9 +265,9 @@ checksum = "572f695136211188308f16ad2ca5c851a712c464060ae6974944458eb83880ba"
 
 [[package]]
 name = "buttplug"
-version = "6.2.0"
+version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41113bd7b2312ef6b5a5d407f7f89cc2b5343d6246f4817966fb3048c8270285"
+checksum = "00a27c1f0aaef837a0a3694b7d13dcf0d72ef8c9130fba04eb138d5b813d9e95"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1780,9 +1780,9 @@ dependencies = [
 
 [[package]]
 name = "process-memory"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61d7c67e1d5e7e8e100ce1240b08e3a7249fe7d02b04232f006f8f60f27791fe"
+checksum = "ae9599c34fcc8067c3105dc746c0ce85e3ea61784568b8234179fad490b1dcc1"
 dependencies = [
  "libc",
  "mach 0.3.2",
@@ -2042,9 +2042,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "sdl2"
-version = "0.35.1"
+version = "0.35.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f035f8e87735fa3a8437292be49fe6056450f7cbb13c230b4bcd1bdd7279421f"
+checksum = "f7959277b623f1fb9e04aea73686c3ca52f01b2145f8ea16f4ff30d8b7623b1a"
 dependencies = [
  "bitflags",
  "lazy_static",
@@ -2054,9 +2054,9 @@ dependencies = [
 
 [[package]]
 name = "sdl2-sys"
-version = "0.35.1"
+version = "0.35.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94cb479353c0603785c834e2307440d83d196bf255f204f7f6741358de8d6a2f"
+checksum = "e3586be2cf6c0a8099a79a12b4084357aa9b3e0b0d7980e3b67aaf7a9d55f9f0"
 dependencies = [
  "cfg-if",
  "cmake",

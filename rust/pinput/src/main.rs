@@ -22,6 +22,7 @@ mod runtime_connection;
 use crate::constants::{FRAME_DURATION_MS, PINPUT_MAGIC, PINPUT_MAX_GAMEPADS, SCAN_INTERVAL_MS};
 use crate::error::Error;
 use crate::gamepad::{sync_gamepad, PinputGamepadArray, SdlGamepad};
+#[cfg(feature = "haptics")]
 use crate::haptic_subsystem::HapticSubsystem;
 use crate::runtime_connection::RuntimeConnection;
 
@@ -52,7 +53,7 @@ fn run_gamepad_loop(
     keep_going: &Arc<AtomicBool>,
     joystick_subsystem: &JoystickSubsystem,
     game_controller_subsystem: &GameControllerSubsystem,
-    haptic_subsystem: &HapticSubsystem,
+    #[cfg(feature = "haptics")] haptic_subsystem: &HapticSubsystem,
     runtime_connection: &RuntimeConnection,
 ) -> Result<(), Error> {
     let (timer_tx, timer_rx) = channel();
@@ -75,7 +76,7 @@ fn run_gamepad_loop(
         // We could also run the SDL event loop, which would call this automatically.
         game_controller_subsystem.update();
 
-        let magic = match runtime_connection.gpio_as_uuid.read() {
+        let magic = match unsafe { runtime_connection.gpio_as_uuid.read() } {
             Ok(magic) => magic,
             Err(err) => {
                 // Failure here probably indicates that the runtime quit.
@@ -89,7 +90,7 @@ fn run_gamepad_loop(
         if magic == PINPUT_MAGIC {
             gamepads = PinputGamepadArray::default();
         } else {
-            gamepads = match runtime_connection.gpio_as_gamepads.read() {
+            gamepads = match unsafe { runtime_connection.gpio_as_gamepads.read() } {
                 Ok(gamepads) => gamepads,
                 Err(err) => {
                     // Failure here probably indicates that the runtime quit.
@@ -140,17 +141,20 @@ fn run_gamepad_loop(
             }
         }
 
-        // Put haptic devices at the end of the list after gamepads.
-        // TODO: this doesn't make a ton of sense as is since adding gamepads will renumber haptics.
-        // TODO: when fixed, remember to zero out vibe info for Pinput gamepads past the last connected vibe.
-        let haptic_devices = haptic_subsystem.devices();
-        let gamepad_indexes = sdl_num_joysticks as usize
-            ..min(
-                sdl_num_joysticks as usize + haptic_devices.len(),
-                PINPUT_MAX_GAMEPADS,
-            );
-        for (gamepad_index, haptic_device) in gamepad_indexes.zip(haptic_devices) {
-            haptic_subsystem.sync_haptic_device(&haptic_device, &mut gamepads[gamepad_index]);
+        #[cfg(feature = "haptics")]
+        {
+            // Put haptic devices at the end of the list after gamepads.
+            // TODO: this doesn't make a ton of sense as is since adding gamepads will renumber haptics.
+            // TODO: when fixed, remember to zero out vibe info for Pinput gamepads past the last connected vibe.
+            let haptic_devices = haptic_subsystem.devices();
+            let gamepad_indexes = sdl_num_joysticks as usize
+                ..min(
+                    sdl_num_joysticks as usize + haptic_devices.len(),
+                    PINPUT_MAX_GAMEPADS,
+                );
+            for (gamepad_index, haptic_device) in gamepad_indexes.zip(haptic_devices) {
+                haptic_subsystem.sync_haptic_device(&haptic_device, &mut gamepads[gamepad_index]);
+            }
         }
 
         match runtime_connection.gpio_as_gamepads.write(&gamepads) {
@@ -207,23 +211,38 @@ fn main() -> Result<(), Error> {
         args[0].clone()
     };
     let mut show_usage = false;
-    let mut haptics_server: Option<String> = None;
-    if !(args.len() == 1 || args.len() == 3)
+    let expected_lengths = vec![
+        1,
+        #[cfg(feature = "haptics")]
+        3,
+    ];
+    if !expected_lengths.contains(&args.len())
         || args.contains(&"-h".to_owned())
         || args.contains(&"--help".to_owned())
     {
         show_usage = true;
     }
-    for i in 1..args.len() - 1 {
-        if args[i] == "--haptics-server" {
-            haptics_server = Some(args[i + 1].clone());
-        } else {
-            show_usage = true;
-            break;
+
+    #[cfg(feature = "haptics")]
+    let haptics_server: Option<String> = {
+        let mut haptics_server = None;
+        for i in 1..args.len() - 1 {
+            if args[i] == "--haptics-server" {
+                haptics_server = Some(args[i + 1].clone());
+                break;
+            } else {
+                show_usage = true;
+                break;
+            }
         }
-    }
+        haptics_server
+    };
+
     if show_usage {
+        #[cfg(feature = "haptics")]
         println!("usage: {name} [--haptics-server ws://127.0.0.1:12345]");
+        #[cfg(not(feature = "haptics"))]
+        println!("usage: {name}");
         return Ok(());
     }
 
@@ -245,6 +264,7 @@ fn main() -> Result<(), Error> {
     let game_controller_subsystem = sdl_context
         .game_controller()
         .map_err(|s| Error::SdlStringError(s))?;
+    #[cfg(feature = "haptics")]
     let haptic_subsystem = HapticSubsystem::new(haptics_server)?;
 
     // TODO: treat `KilledByCtrlC` as a normal exit.
@@ -258,6 +278,7 @@ fn main() -> Result<(), Error> {
             &keep_going,
             &joystick_subsystem,
             &game_controller_subsystem,
+            #[cfg(feature = "haptics")]
             &haptic_subsystem,
             &runtime_connection,
         )?;
