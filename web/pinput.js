@@ -369,7 +369,7 @@ export function addHapticsButton() {
 
         p8_gfx_dat['p8b_haptics'] = vibeIcon;
         document.getElementById('p8_menu_buttons').innerHTML += '' +
-            '<div class="p8_menu_button" style="position:absolute; bottom:-15px" ' +
+            '<div class="p8_menu_button" style="position:absolute; bottom:160px" ' +
             'id="p8b_haptics">' +
             '   <img width="24" height="24" style="pointer-events:none">' +
             '</div>';
