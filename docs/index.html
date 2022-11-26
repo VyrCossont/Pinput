@@ -1,9 +1,12 @@
 ﻿<html><head>
 <title>Pinput (web edition)</title>
 <meta name="viewport" content="width=device-width, user-scalable=no">
+<script lang='javascript' src='https://cdn.jsdelivr.net/npm/buttplug@1.0.16/dist/web/buttplug.min.js'></script>
 <script type='module' src='./pinput.js'></script>
 <script type='module'>
 	import * as Pinput from './pinput.js';
+	Pinput.addHapticsButton();
+	Pinput.initHapticsOnPlayerClick();
 	Pinput.init();
 </script>
 <script type="text/javascript">
