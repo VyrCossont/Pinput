@@ -319,7 +319,7 @@ export async function initHaptics() {
     }
     client.addListener('deviceadded', (device) => {
         const numVibes = device.messageAttributes(Buttplug.ButtplugDeviceMessageType.VibrateCmd).featureCount;
-        console.log(`Buttplug device connected: ${device.Name}, ${numVibes} motors`);
+        console.log(`Buttplug device connected: ${device.Name}, ${numVibes} vibration actuators`);
     });
     client.addListener('deviceremoved', (device) => {
         console.log(`Buttplug device disconnected: ${device.Name}`);

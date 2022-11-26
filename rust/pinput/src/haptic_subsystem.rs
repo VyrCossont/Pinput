@@ -2,7 +2,9 @@
 
 use crate::error::Error;
 use crate::gamepad::{PinputGamepad, PinputGamepadButtons, PinputGamepadFlags};
-use buttplug::client::{ButtplugClientDevice, ButtplugClientEvent, VibrateCommand};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, VibrateCommand};
+use buttplug::core::connector::{ButtplugRemoteClientConnector, ButtplugWebsocketClientTransport};
+use buttplug::core::message::serializer::ButtplugClientJSONSerializer;
 use buttplug::core::message::ActuatorType;
 use buttplug::util::in_process_client;
 use futures::{Stream, StreamExt};
@@ -18,14 +20,47 @@ use tokio::runtime::Runtime;
 /// TODO: handle device disconnection by reserving slots in a Vec<Option<HapticDevice>> or something
 pub struct HapticSubsystem {
     rt: Arc<Runtime>,
+    // TODO: we might be able to get rid of this and just use the client's device list.
     devices: Arc<Mutex<BTreeSet<HapticDevice>>>,
 }
 
 impl HapticSubsystem {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(haptics_server: Option<String>) -> Result<Self, Error> {
         let rt = Arc::new(Runtime::new()?);
-        let client = rt.block_on(in_process_client("Pinput Client", false));
+        let client_name = "Pinput";
+        let client = (if let Some(address) = haptics_server {
+            rt.block_on(async move {
+                let connector = ButtplugRemoteClientConnector::<
+                    ButtplugWebsocketClientTransport,
+                    ButtplugClientJSONSerializer,
+                >::new(
+                    ButtplugWebsocketClientTransport::new_insecure_connector(&address),
+                );
+                let client = ButtplugClient::new(client_name);
+                if let Err(e) = client.connect(connector).await {
+                    println!("Buttplug client connection failed! {e:?}");
+                    return Err(Error::ButtplugClientError(e));
+                }
+                Ok(client)
+            })
+        } else {
+            rt.block_on(async move {
+                let client = in_process_client(client_name, false).await;
+                Ok(client)
+            })
+        })?;
+
         let devices = Arc::new(Mutex::new(BTreeSet::new()));
+        if let Ok(mut devices) = devices.lock() {
+            for device in client.devices() {
+                let num_vibes = device.num_vibration_actuators();
+                println!("Buttplug device connected: {device:?}, {num_vibes} vibration actuators");
+                devices.insert(HapticDevice::new(device));
+            }
+        } else {
+            println!("Buttplug device set mutex poisoned!");
+        }
+
         rt.block_on(client.start_scanning())?;
         let event_stream = client.event_stream();
         rt.spawn(handle_client_events(event_stream, devices.clone()));
