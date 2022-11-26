@@ -1,5 +1,13 @@
 // JS module that imports and starts Pinput.
 import * as Pinput from './pinput.js';
+
+// Inject dependencies.
+// TODO: find a way to bundle WASM into a web extension.
+const buttplugCdnSrc = 'https://cdn.jsdelivr.net/npm/buttplug@1.0.16/dist/web/buttplug.min.js';
+const buttplugScript = document.createElement('script');
+buttplugScript.src = buttplugCdnSrc;
+document.documentElement.appendChild(buttplugScript);
+
 if (typeof chrome !== 'undefined'
     && typeof chrome.runtime !== 'undefined'
     && typeof chrome.runtime.getURL !== 'undefined') {
@@ -14,5 +22,6 @@ if (typeof chrome !== 'undefined'
     script.src = chrome.runtime.getURL('pinput-extension.js');
     document.documentElement.appendChild(script);
 } else {
+	Pinput.addHapticsButton();
     Pinput.init();
 }
