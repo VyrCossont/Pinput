@@ -33,6 +33,7 @@ const connected = 1 << 0;
 const hasGuideButton = 1 << 3;
 const hasMiscButton = 1 << 4;
 const hasRumble = 1 << 5;
+const hapticDevice = 1 << 6;
 
 // Gamepad battery status not supported.
 
@@ -82,8 +83,12 @@ const rumbleMappings = new Map();
 rumbleMappings.set(0, [loFreqRumbleOffset, 'weakMagnitude']);
 rumbleMappings.set(1, [hiFreqRumbleOffset, 'strongMagnitude']);
 
+let buttplugInitAttempted = false;
+/** @type Buttplug.ButtplugClient */
+let buttplugClient = null;
+
 /** Called by `loop` to push gamepad inputs into PICO-8's GPIO area. */
-function sync() {
+async function sync() {
     let gpio;
     if (window.wrappedJSObject !== undefined) {
         // We're in a Firefox extension content script:
@@ -111,7 +116,8 @@ function sync() {
 
     // Write each supported gamepad's current state into GPIO.
     // Note: `navigator.getGamepads()` does not return an array on Chrome.
-    for (const [gamepadIndex, gamepad] of Array.from(navigator.getGamepads()).slice(0, maxGamepads).entries()) {
+    let gamepads = Array.from(navigator.getGamepads()).slice(0, maxGamepads);
+    for (const [gamepadIndex, gamepad] of gamepads.entries()) {
         const gamepadBase = gamepadIndex * gamepadStride;
         if (gamepad === null || gamepad.mapping !== 'standard' || !gamepad.connected) {
             // This is a disconnected or unsupported gamepad: zero it and go to the next one.
@@ -132,6 +138,7 @@ function sync() {
         // https://docs.google.com/document/d/1jPKzVRNzzU4dUsvLpSXm1VXPQZ8FP-0lKMT-R_p-s6g/edit
         const hasSupportedVibrationActuator =
             gamepad.vibrationActuator !== undefined
+            && gamepad.vibrationActuator !== null
             && gamepad.vibrationActuator.type === 'dual-rumble';
 
         // Some gamepads use the standard mapping but have a `buttons` array too short to have the guide button.
@@ -221,9 +228,11 @@ function sync() {
         }
 
         // Rumble, if this browser and gamepad support it.
+        // Note that the gpio array may be the right length but have undefined entries,
+        // so we need to handle that by providing a default.
         if (hasSupportedGamepadHapticActuators) {
             for (const [rumbleIndex, [rumbleOffset, _]] of rumbleMappings) {
-                const rumble = gpio[gamepadBase + rumbleOffset] / rumbleMax;
+                const rumble = (gpio[gamepadBase + rumbleOffset] || 0) / rumbleMax;
                 const _ = gamepad.hapticActuators[rumbleIndex].pulse(rumble, rumbleDurationMs);
             }
         } else if (hasSupportedVibrationActuator) {
@@ -232,25 +241,144 @@ function sync() {
                 duration: rumbleDurationMs,
             }
             for (const [_, [rumbleOffset, rumbleKey]] of rumbleMappings) {
-                effect[rumbleKey] = gpio[gamepadBase + rumbleOffset] / rumbleMax;
+                effect[rumbleKey] = (gpio[gamepadBase + rumbleOffset] || 0) / rumbleMax;
             }
             gamepad.vibrationActuator.playEffect('dual-rumble', effect);
+        }
+    }
+
+    if (buttplugClient === null) {
+        return;
+    }
+
+    for (const [index, device] of buttplugClient.Devices.entries()) {
+        const gamepadIndex = gamepads.length + index;
+        if (index >= maxGamepads) {
+            break;
+        }
+        const gamepadBase = gamepadIndex * gamepadStride;
+        const loFreqRumble = (gpio[gamepadBase + loFreqRumbleOffset] || 0) / rumbleMax;
+        const hiFreqRumble = (gpio[gamepadBase + hiFreqRumbleOffset] || 0) / rumbleMax;
+        const numVibes = device.messageAttributes(Buttplug.ButtplugDeviceMessageType.VibrateCmd).featureCount;
+
+        let flags = connected | hapticDevice;
+        if (numVibes > 0) {
+            flags |= hasRumble;
+        }
+        gpio[gamepadBase] = flags;
+
+        // Vibrators only past this point.
+        if (numVibes === 0) {
+            continue;
+        }
+
+        try {
+            if (numVibes === 2) {
+                await device.vibrate([loFreqRumble, hiFreqRumble]);
+            } else {
+                await device.vibrate(Math.max(loFreqRumble, hiFreqRumble));
+            }
+        } catch (error) {
+            console.error(`Buttplug: ${error}`);
         }
     }
 }
 
 /** Runs `sync` in a try-catch block and then schedules itself again. */
-function loop() {
+async function loop() {
     try {
-        sync();
+        await sync();
     } catch (error) {
         console.error(`Pinput: ${error}`);
     }
     window.requestAnimationFrame(loop);
 }
 
+/** Has to be called from an interaction event handler to be allowed to use Bluetooth. */
+export async function initHaptics() {
+    if (buttplugInitAttempted) {
+        // Already initialized.
+        return;
+    }
+    buttplugInitAttempted = true;
+
+    await Buttplug.buttplugInit();
+    const client = new Buttplug.ButtplugClient("Pinput");
+    const hasBluetooth = window.Bluetooth !== undefined;
+    let btPromptAddendum = hasBluetooth ? ' (cancel to try Bluetooth in browser)' : '';
+    const server = window.prompt(`Haptics: enter buttplug.io websocket server address${btPromptAddendum}:`, "ws://127.0.0.1:12345");
+    let connector;
+    if (server === null) {
+        if (hasBluetooth) {
+            connector = new Buttplug.ButtplugEmbeddedConnectorOptions();
+        } else {
+            return;
+        }
+    } else {
+        connector = new Buttplug.ButtplugWebsocketConnectorOptions(server);
+    }
+    client.addListener('deviceadded', (device) => {
+        const numVibes = device.messageAttributes(Buttplug.ButtplugDeviceMessageType.VibrateCmd).featureCount;
+        console.log(`Buttplug device connected: ${device.Name}, ${numVibes} motors`);
+    });
+    client.addListener('deviceremoved', (device) => {
+        console.log(`Buttplug device disconnected: ${device.Name}`);
+    });
+    await client.connect(connector);
+    await client.startScanning();
+    buttplugClient = client;
+}
+
+async function reinitHaptics() {
+    buttplugInitAttempted = false;
+    buttplugClient = null;
+    await initHaptics();
+}
+
+function onLoad(f) {
+    if (document.readyState !== 'complete') {
+        window.addEventListener('load', f);
+    } else {
+        f();
+    }
+}
+
+export function initHapticsOnPlayerClick() {
+    onLoad((_) => {
+        document.getElementById('p8_container').addEventListener('click', initHaptics);
+    })
+}
+
+const vibeIcon = 'data:image/png;base64,' +
+    'iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAJBJREFUSIntlL0OgCAM' +
+    'hAtxd/X9n46VJ6gTpsFruYiTchMh9L7+BZGlf0lrUa1F34zPM0AmoWwfi4ik/Uhcvne1WAt1K2CAyLBXZ' +
+    's3au1FLeiisAAGtsT2PqgiHjAyju8eAGVEANBt22yAA9dUaotl4wOwZemBm06yn2yIGyq' +
+    'z3BWCriISAWxQwasfMt7L0IZ0FY3cnh/Y4aAAAAABJRU5ErkJggg==';
+
+export function addHapticsButton() {
+    onLoad((_) => {
+        // Have to add an entry to p8_gfx_dat because the PICO-8 player code
+        // changes all button images to values from it.
+
+        p8_gfx_dat['p8b_haptics_touch'] = vibeIcon;
+        document.getElementById('p8_menu_buttons_touch').innerHTML += '' +
+            '<div class="p8_menu_button" style="float:left;margin-left:10px" id="p8b_haptics_touch">' +
+            '   <img width="24" height="24" style="pointer-events:none">' +
+            '</div>';
+        document.getElementById('p8b_haptics_touch').addEventListener('click', reinitHaptics);
+
+        p8_gfx_dat['p8b_haptics'] = vibeIcon;
+        document.getElementById('p8_menu_buttons').innerHTML += '' +
+            '<div class="p8_menu_button" style="position:absolute; bottom:-15px" ' +
+            'id="p8b_haptics">' +
+            '   <img width="24" height="24" style="pointer-events:none">' +
+            '</div>';
+        document.getElementById('p8b_haptics').addEventListener('click', reinitHaptics);
+    });
+}
+
 /** Call this to start running the update loop. */
-export function init() {
+export async function init() {
     console.log('Pinput: initialized');
     window.requestAnimationFrame(loop);
 }
