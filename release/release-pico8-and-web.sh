@@ -11,6 +11,9 @@ pico8_src_dir="${release_dir}/../PICO-8"
 web_src_dir="${release_dir}/../web"
 docs_dir="${release_dir}/../docs"
 
+version="$(cat release/version.txt)"
+artifact_path="${release_dir}/artifacts/pinput_tester-${version}.p8.png"
+
 pico8_apps_path="/Applications/PICO-8.app/Contents/MacOS/pico8"
 pico8_itch_path="${HOME}/Library/Application Support/itch/apps/pico-8/pico-8/PICO-8.app/Contents/MacOS/pico8"
 pico8_path=$(
@@ -28,6 +31,9 @@ fi
 "${pico8_path}" \
   "${pico8_src_dir}/pinput_tester.p8" \
   -export "${pico8_src_dir}/pinput_tester.p8.png"
+
+# Put a copy in the artifacts folder.
+cp "${pico8_src_dir}/pinput_tester.p8.png" "${artifact_path}"
 
 # Export HTML version.
 "${pico8_path}" \
