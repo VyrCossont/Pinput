@@ -11,6 +11,7 @@
 * [Introduction](#introduction)
 * [PICO-8 development](#pico-8-development)
 * [WASM-4 development](#wasm-4-development)
+* [Haptics](#haptics)
 * [Instructions](#instructions)
   * [Rust](#rust)
   * [macOS](#macos)
@@ -31,7 +32,7 @@
 
 ## Introduction
 
-Ever wish [PICO-8](https://www.lexaloffle.com/pico-8.php) had dual analog stick support? Me too. Pinput is a Lua library that works with PICO-8's GPIO memory area and an external helper app to provide [XInput](https://docs.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput)-like gamepad support to an unmodifed copy of PICO-8. This gets you two analog sticks, two analog triggers, up to 16 digital buttons, and even rumble support, for up to 8 gamepads. Pinput supports macOS, Windows, Linux, Chrome, Firefox, and Safari.
+Ever wish [PICO-8](https://www.lexaloffle.com/pico-8.php) had dual analog stick support? Me too. Pinput is a Lua library that works with PICO-8's GPIO memory area and an external helper app to provide [XInput](https://docs.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput)-like gamepad support to an unmodifed copy of PICO-8. This gets you two analog sticks, two analog triggers, up to 16 digital buttons, and even rumble support, for up to 8 gamepads or haptic devices like vibrators. Pinput supports macOS, Windows, Linux, Chrome, Firefox, and Safari.
 
 [![The author demonstrating the web version of Pinput by moving gamepad](docs/Pinput-demo-web.jpg)](https://raw.githubusercontent.com/VyrCossont/Pinput/main/docs/Pinput-demo-web.mp4)
 
@@ -62,6 +63,22 @@ Check out [`gamepad.rs` in the WASM-4 Pinput tester cartridge source](WASM-4/pin
 
 The WASM-4 Pinput tester currently uses the 128-byte reserved area starting at `0x0020` for communication with Pinput, because the only thing that uses that area is netplay. Pinput would break netplay by providing an alternate input method that isn't integrated with netcode (much like how you can't use the mouse in a WASM-4 netplay cartridge), and the native runtimes for WASM-4 don't support netplay yet anyway, so there's no conflict. However, you can use _any_ 128-byte area of memory to communicate with Pinput, simply by placing the Pinput magic bytes at the start of it.
 
+## Haptics
+
+Pinput also incorporates support for local haptic devices (currently, vibrators) and haptic servers using [buttplug.io](https://buttplug.io/). Local devices don't require any additional software, but using a haptic server like [Intiface Central](https://github.com/intiface/intiface-central) gives you a nice little GUI for testing devices, diagnostic logging, and also may support future devices that Pinput doesn't have built-in support for.
+
+At the Pinput API level, haptic devices are treated as another kind of gamepad with the `HAPTIC_DEVICE` flag set, and you use the same rumble APIs to control them:
+
+```lua
+if pi_flag(pi_haptic_device, gamepad_index) then
+  -- The device at gamepad_index is a vibrator.
+  -- Set its low-frequency motor to half power.
+  pi_rumble(pi_lo, 127, gamepad_index)
+end 
+```
+
+Pinput does not yet support buttons, sensors, or battery status on haptic devices.
+
 ## Instructions
 
 ![The pinput_tester.p8 PICO-8 cartridge.](PICO-8/pinput_tester.p8.png)
@@ -72,7 +89,7 @@ Open and run the cartridge in PICO-8. It will display `waiting for pinput connec
 
 Start Pinput. Note that most versions are console apps and need to be run from your terminal.
 
-Once both the app and the cartridge are running, the cartridge should switch from displaying `waiting for pinput connection...` to showing the state of player 1's gamepad. Try moving the sticks and pressing some buttons, and the display should update as you do. If your system, gamepad, and Pinput version support rumble, the cartridge will show the words `has rumble`, and you can hold down either trigger to test the rumble motors.
+Once both the app and the cartridge are running, the cartridge should switch from displaying `waiting for pinput connection...` to showing the state of player 1's gamepad. Try moving the sticks and pressing some buttons, and the display should update as you do. If your system, gamepad, and Pinput version support rumble, the cartridge will show the words `has rumble`, and you can hold down either trigger to test the rumble motors, and those of any connected haptic devices.
 
 ### Rust
 
@@ -83,6 +100,10 @@ The Rust + SDL version of Pinput (`pinput-rust-….zip`) is the newest and best 
 - Windows users: you don't need to do anything special. `pinput.exe` should just work.
 
 On starting Pinput, it will print `Failed to connect to a runtime: NoProcessesFound` every second until it detects a running PICO-8 or WASM-4 cartridge with Pinput support, at which point it will print a message like `connected: PICO-8, PID 18649`. It may also print diagnostic messages like `PS4 Controller doesn't support rumble.` depending on your OS and gamepad.
+
+You can connect new gamepads or haptic devices at any time, and you should see a console message when doing so.
+
+To use a haptic server, you'll need to run `pinput` with the `--haptics-server ws://127.0.0.1:12345` option. That's the default URL for Intiface Central's server; change it if your setup is different.
 
 Press Ctrl-C to exit when you're done.
 
@@ -119,9 +140,15 @@ Want to try it right now? Connect a gamepad and [run the gamepad test cartridge 
 
 Alternatively, check this repo out, run `python3 -m http.server 8080` in the repo to serve it locally, and run `open http://localhost:8080/docs/` (or `xdg-open` on Linux, or `start` on Windows) to open the test cartridge in your browser. You may need to press some buttons to get your gamepad to start talking to your browser.
 
+User interaction is required to start haptics in all supported browsers, and the user will then need to pair a BTLE device or provide the URL for a haptic server, so the Pinput JS module includes two methods for this, which can be called before Pinput's `init` method:
+- `addHapticsButton` is suitable for all contexts. It adds a 📳 button to the usual PICO-8 player menu buttons. Click or tap it to connect a haptic device or server.
+- `initHapticsOnPlayerClick` is suitable for sex games, and brings up the haptic connection prompt when the user clicks the PICO-8 player (which is already required to start audio on some platforms). This saves a step.
+
 #### web extension
 
 The web extension lets you use Pinput with the web player on the [Lexaloffle BBS](https://www.lexaloffle.com/bbs/?cat=7). You can download the web extensions for Firefox and Chrome from [this GitHub project's releases](https://github.com/VyrCossont/Pinput/releases); they're not yet on either browser's extension site. Once you've downloaded one, unzip it, and then follow the developer installation instructions for [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) or [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/#manifest).
+
+The web extension never tries to start haptics on game start, since most BBS games will not support it. Look for the 📳 button.
 
 ## Current status
 
@@ -133,6 +160,8 @@ Note that as of the current version, rumble does not work with DualShock or Xbox
 
 Supports PICO-8 and WASM-4.
 
+Supports local haptic devices connected over BTLE (Bluetooth Low Energy) or serial ports, and haptic servers.
+
 ### macOS
 
 Supports reading all buttons, sticks, triggers, and the battery level and charging status, plus activating rumble, from up to 8 controllers.
@@ -143,6 +172,8 @@ Controller-wise, I've tested it with an Xbox Wireless Controller with Bluetooth 
 
 Supports PICO-8 only.
 
+Does not support haptic devices or servers.
+
 ### Windows
 
 Supports reading all buttons, sticks, triggers, and the battery level, plus activating rumble, from up to 4 XInput controllers. Non-XInput controllers are not supported.
@@ -150,6 +181,8 @@ Supports reading all buttons, sticks, triggers, and the battery level, plus acti
 The current implementation has been tested on Windows 10 Build 19042 and an x64 (aka x86_64 or amd64) machine, with both the x86 and x64 release builds of the Pinput console app. It may or may not run on older versions of Windows. It doesn't use anything newer than Vista's version of XInput, so it should be portable to older versions, but I don't have any older machines to test on.
 
 Supports PICO-8 only.
+
+Does not support haptic devices or servers.
 
 ### web
 
@@ -163,9 +196,13 @@ The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for m
 
 Supports PICO-8 only.
 
+Supports local BTLE haptic devices using [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) (Chrome) and remote haptic servers using websockets (Chrome, Safari). Haptic devices and servers are not supported in Firefox, as it currently fails to connect to a local Intiface Central server.
+
 #### web extension
 
 Supports Chrome and Firefox. Not available from their extension sites yet ([Chrome Web Store](https://chrome.google.com/webstore/category/extensions), [Firefox Browser Add-Ons](https://addons.mozilla.org/firefox/extensions/)), and not functional on Safari yet due to [Safari's weird packaging requirements](https://developer.apple.com/documentation/safariservices/safari_web_extensions/running_your_safari_web_extension). Restricted to the Lexaloffle BBS. Otherwise identical to the version of Pinput for exported web cartridges.
+
+Haptic device and server support is identical to the standalone JS version.
 
 ## Future goals
 
