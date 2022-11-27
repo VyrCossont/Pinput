@@ -196,7 +196,7 @@ The Logitech F310 in DirectInput mode works in Firefox, Chrome, and Safari for m
 
 Supports PICO-8 only.
 
-Supports local BTLE haptic devices using [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) (Chrome) and remote haptic servers using websockets (Chrome, Safari). Haptic devices and servers are not supported in Firefox, as it currently fails to connect to a local Intiface Central server.
+Supports local BTLE haptic devices using [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) (Chrome) and haptic servers using websockets (Chrome, Firefox, Safari).
 
 #### web extension
 
