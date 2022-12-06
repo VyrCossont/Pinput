@@ -2,16 +2,24 @@
 
 use crate::error::Error;
 use crate::gamepad::{PinputGamepad, PinputGamepadButtons, PinputGamepadFlags};
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, VibrateCommand};
+use buttplug::client::{
+    ButtplugClient, ButtplugClientDevice, ButtplugClientDeviceEvent, ButtplugClientEvent,
+    VibrateCommand,
+};
 use buttplug::core::connector::{ButtplugRemoteClientConnector, ButtplugWebsocketClientTransport};
 use buttplug::core::message::serializer::ButtplugClientJSONSerializer;
-use buttplug::core::message::ActuatorType;
+use buttplug::core::message::{ActuatorType, ButtplugCurrentSpecServerMessage, SensorType};
 use buttplug::util::in_process_client;
 use futures::{Stream, StreamExt};
 use std::cmp::{max, Ordering};
 use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicI32, AtomicU8};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
+use tokio::time;
+use tokio::time::Duration;
 
 /// Buttplug client wrapper.
 /// Not a real SDL subsystem like gamepads or joysticks,
@@ -53,9 +61,7 @@ impl HapticSubsystem {
         let devices = Arc::new(Mutex::new(BTreeSet::new()));
         if let Ok(mut devices) = devices.lock() {
             for device in client.devices() {
-                let num_vibes = device.num_vibration_actuators();
-                println!("Buttplug device connected: {device:?}, {num_vibes} vibration actuators");
-                devices.insert(HapticDevice::new(device));
+                devices.insert(HapticDevice::new(rt.clone(), device));
             }
         } else {
             println!("Buttplug device set mutex poisoned!");
@@ -63,7 +69,11 @@ impl HapticSubsystem {
 
         rt.block_on(client.start_scanning())?;
         let event_stream = client.event_stream();
-        rt.spawn(handle_client_events(event_stream, devices.clone()));
+        rt.spawn(handle_client_events(
+            rt.clone(),
+            event_stream,
+            devices.clone(),
+        ));
         let haptic_subsystem = Self { rt, devices };
         Ok(haptic_subsystem)
     }
@@ -87,37 +97,83 @@ impl HapticSubsystem {
         gamepad.flags.insert(PinputGamepadFlags::CONNECTED);
 
         // Report vibration capability.
-        let num_vibes = haptic_device.device.num_vibration_actuators();
-        if num_vibes > 0 {
+        if haptic_device.num_vibes > 0 {
             gamepad.flags.insert(PinputGamepadFlags::HAS_RUMBLE);
-        } else {
-            println!(
-                "Buttplug device {} does not support vibration",
-                haptic_device.device.name()
-            );
         }
 
-        // TODO: battery and charging state
-        gamepad.battery = 0;
+        // Report battery. Buttplug doesn't support charging state.
+        gamepad.battery = if let Some(battery_level) = &haptic_device.battery_level {
+            gamepad.flags.insert(PinputGamepadFlags::HAS_BATTERY);
+            battery_level.load(SeqCst)
+        } else {
+            0
+        };
 
-        // Buttplug doesn't currently support buttons/sensors, so zero out the inputs.
-        // TODO: add sensor support to upstream
-        gamepad.buttons = PinputGamepadButtons::default();
+        // Zero out the inputs.
+        let mut buttons = PinputGamepadButtons::default();
         gamepad.left_trigger = 0;
         gamepad.right_trigger = 0;
         gamepad.left_stick_x = 0;
         gamepad.left_stick_y = 0;
         gamepad.right_stick_x = 0;
         gamepad.right_stick_y = 0;
+        let mut axis_index = 0usize;
+        // We can't have unaligned references to these packed fields.
+        let axis_mappings: [fn(&mut PinputGamepad, i16); 4] = [
+            |g, v| g.left_stick_x = v,
+            |g, v| g.left_stick_y = v,
+            |g, v| g.right_stick_x = v,
+            |g, v| g.right_stick_y = v,
+        ];
+        let mut button_index = 0usize;
+        let button_mappings = [
+            PinputGamepadButtons::A,
+            PinputGamepadButtons::B,
+            PinputGamepadButtons::X,
+            PinputGamepadButtons::Y,
+        ];
+        for ((input_type, ranges), input) in haptic_device
+            .input_props
+            .iter()
+            .zip(haptic_device.inputs.iter())
+        {
+            for (range, v) in ranges.iter().zip(input) {
+                let scaled = (v.load(SeqCst) as f64 - *range.start() as f64)
+                    / (*range.end() as f64 - *range.start() as f64);
+                match *input_type {
+                    SensorType::Button => {
+                        if button_index >= button_mappings.len() {
+                            continue;
+                        }
+                        if scaled >= 0.5 {
+                            buttons.insert(button_mappings[button_index]);
+                        }
+                        button_index += 1;
+                    }
+                    SensorType::Pressure => {
+                        if axis_index >= axis_mappings.len() {
+                            continue;
+                        }
+                        axis_mappings[axis_index](
+                            gamepad,
+                            (scaled * (i16::MAX as f64 - i16::MIN as f64) + i16::MIN as f64) as i16,
+                        );
+                        axis_index += 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        gamepad.buttons = buttons;
 
         // Vibrators only past this point.
-        if num_vibes == 0 {
+        if haptic_device.num_vibes == 0 {
             return;
         }
 
         // If we have exactly two vibrator actuators, map them directly.
         // Otherwise, set them all to the largest rumble value.
-        let vibrate_command = if num_vibes == 2 {
+        let vibrate_command = if haptic_device.num_vibes == 2 {
             VibrateCommand::SpeedVec(
                 [gamepad.lo_freq_rumble, gamepad.hi_freq_rumble]
                     .into_iter()
@@ -138,17 +194,18 @@ impl HapticSubsystem {
     }
 }
 
-async fn handle_client_events<S>(mut event_stream: S, devices: Arc<Mutex<BTreeSet<HapticDevice>>>)
-where
+async fn handle_client_events<S>(
+    rt: Arc<Runtime>,
+    mut event_stream: S,
+    devices: Arc<Mutex<BTreeSet<HapticDevice>>>,
+) where
     S: Stream<Item = ButtplugClientEvent> + Unpin,
 {
     while let Some(event) = event_stream.next().await {
         match event {
             ButtplugClientEvent::DeviceAdded(device) => {
-                let num_vibes = device.num_vibration_actuators();
-                println!("Buttplug device added: {device:?}, {num_vibes} vibration actuators");
                 if let Ok(mut devices) = devices.lock() {
-                    devices.insert(HapticDevice::new(device));
+                    devices.insert(HapticDevice::new(rt.clone(), device));
                 } else {
                     println!("Buttplug device set mutex poisoned!");
                 }
@@ -156,7 +213,7 @@ where
             ButtplugClientEvent::DeviceRemoved(device) => {
                 println!("Buttplug device removed: {device:?}");
                 if let Ok(mut devices) = devices.lock() {
-                    devices.remove(&HapticDevice::new(device));
+                    devices.retain(|h| h.device != device);
                 } else {
                     println!("Buttplug device set mutex poisoned!");
                 }
@@ -173,31 +230,16 @@ where
     }
 }
 
-/// Convenience methods for Buttplug devices.
-trait ButtplugClientDeviceExt {
-    fn num_vibration_actuators(&self) -> usize;
-}
-
-impl ButtplugClientDeviceExt for ButtplugClientDevice {
-    fn num_vibration_actuators(&self) -> usize {
-        self.message_attributes()
-            .scalar_cmd()
-            .as_ref()
-            .map(|cmds| {
-                cmds.iter()
-                    .filter(|cmd| *cmd.actuator_type() == ActuatorType::Vibrate)
-                    .count()
-            })
-            .unwrap_or(0)
-    }
-}
-
 /// Buttplug device wrapper.
 /// `Eq`/`Ord` assumes we'll never try to compare two different devices that exist simultaneously
 /// but have the same device manager index, because how would that even happen?
 #[derive(Debug, Clone)]
 pub struct HapticDevice {
     device: Arc<ButtplugClientDevice>,
+    num_vibes: usize,
+    battery_level: Option<Arc<AtomicU8>>,
+    input_props: Vec<(SensorType, Vec<RangeInclusive<u32>>)>,
+    inputs: Arc<Vec<Vec<AtomicI32>>>,
 }
 
 impl Eq for HapticDevice {}
@@ -221,7 +263,112 @@ impl Ord for HapticDevice {
 }
 
 impl HapticDevice {
-    pub fn new(device: Arc<ButtplugClientDevice>) -> Self {
-        Self { device }
+    pub fn new(rt: Arc<Runtime>, device: Arc<ButtplugClientDevice>) -> Self {
+        let num_vibes = if let Some(scalar_cmds) = device.message_attributes().scalar_cmd() {
+            scalar_cmds
+                .iter()
+                .filter(|cmd| *cmd.actuator_type() == ActuatorType::Vibrate)
+                .count()
+        } else {
+            0
+        };
+
+        let mut battery_level = None;
+        if let Some(sensors) = device.message_attributes().sensor_read_cmd() {
+            if sensors
+                .iter()
+                .find(|sensor| *sensor.sensor_type() == SensorType::Battery)
+                .is_some()
+            {
+                battery_level = Some(Arc::new(AtomicU8::new(u8::MAX)));
+                rt.spawn(monitor_battery(device.clone(), battery_level.clone()));
+            }
+        }
+
+        // Only supported sensors count, and we total up the number of reported values inside a sensor.
+        let mut num_sensors = 0usize;
+        let mut input_props = vec![];
+        let mut inputs = vec![];
+        if let Some(sensors) = device.message_attributes().sensor_subscribe_cmd() {
+            for sensor in sensors.iter().filter(|sensor| {
+                vec![SensorType::Button, SensorType::Pressure].contains(sensor.sensor_type())
+            }) {
+                let ranges = sensor.sensor_range().clone();
+                num_sensors += ranges.len();
+                input_props.push((*sensor.sensor_type(), ranges));
+                let mut input = vec![];
+                for range in sensor.sensor_range() {
+                    // TODO: sensor ranges and sensor data have different types, bug qdot about it
+                    input.push(AtomicI32::new(*range.start() as i32));
+                }
+                inputs.push(input);
+            }
+        }
+        let inputs = Arc::new(inputs);
+        if num_sensors > 0 {
+            rt.spawn(handle_device_events(device.clone(), inputs.clone()));
+        }
+
+        println!(
+            "Buttplug device added: {device:?}, {num_vibes} vibration actuators, {num_sensors} sensors"
+        );
+
+        Self {
+            device,
+            num_vibes,
+            battery_level,
+            input_props,
+            inputs,
+        }
+    }
+}
+
+async fn monitor_battery(device: Arc<ButtplugClientDevice>, battery_level: Option<Arc<AtomicU8>>) {
+    let mut interval = time::interval(Duration::from_millis(1000));
+    loop {
+        interval.tick().await;
+        match device.battery_level().await {
+            Ok(level) => {
+                if let Some(battery_level) = &battery_level {
+                    battery_level.store((level * u8::MAX as f64) as u8, SeqCst);
+                }
+            }
+            Err(e) => {
+                println!("Ending battery monitor task due to error: {e:?}");
+                return;
+            }
+        }
+    }
+}
+
+async fn handle_device_events(device: Arc<ButtplugClientDevice>, inputs: Arc<Vec<Vec<AtomicI32>>>) {
+    let mut event_stream = device.event_stream();
+    for (sensor_index, sensor) in (0..).zip(
+        device
+            .message_attributes()
+            .sensor_subscribe_cmd()
+            .as_ref()
+            .expect(
+                "Shouldn't fail, we already checked for sensors in the HapticDevice constructor",
+            )
+            .iter()
+            .filter(|sensor| {
+                vec![SensorType::Button, SensorType::Pressure].contains(sensor.sensor_type())
+            }),
+    ) {
+        let sensor_type = *sensor.sensor_type();
+        if let Err(e) = device.subscribe_sensor(sensor_index, sensor_type).await {
+            println!("Couldn't subscribe to {sensor_type} sensor at index {sensor_index}: {e:?}");
+        }
+    }
+    while let Some(event) = event_stream.next().await {
+        if let ButtplugClientDeviceEvent::Message(
+            ButtplugCurrentSpecServerMessage::SensorReading(ref reading),
+        ) = event
+        {
+            for (i, v) in reading.data().iter().enumerate() {
+                inputs[reading.sensor_index() as usize][i].store(*v, SeqCst);
+            }
+        }
     }
 }
